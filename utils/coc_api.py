@@ -119,42 +119,46 @@ def get_current_war_data(clan_tag, coc_email, coc_password):
     return asyncio.run(_fetch_war())
 
 # --- NOVA FUNÇÃO PARA DADOS DA LIGA DE CLÃS (CWL) ---
-@st.cache_data(ttl="2h") # Cache maior, pois os dados da CWL são mais estáveis
+@st.cache_data(ttl="2h")
 def get_cwl_data(clan_tag, coc_email, coc_password):
     """
-    Busca e consolida todos os dados de ataque da CWL atual.
+    Busca e consolida todos os dados de ataque da CWL atual,
+    usando o método correto para a v3.9.1 da biblioteca.
     """
     async def _fetch_cwl():
         client = coc.Client()
         try:
             await client.login(coc_email, coc_password)
+            
             try:
-                group = await client.get_clan_war_league_group(clan_tag)
+                # 1. Usando a função correta: get_league_group()
+                group = await client.get_league_group(clan_tag)
             except coc.NotFound:
                 return None, None 
 
             all_attacks_data = []
-            for war_day, round_data in enumerate(group.rounds, 1):
-                our_war_tag = next((tag for tag in round_data.war_tags if clan_tag in tag), None)
+            
+            # 2. Usando o método mais simples para iterar sobre as guerras do clã
+            war_day = 0
+            async for war in group.get_wars_for_clan(clan_tag):
+                war_day += 1
+                # Garante que 'clan_side' seja o nosso clã
+                clan_side = war.clan if war.clan.tag == clan_tag else war.opponent
 
-                if our_war_tag:
-                    war = await client.get_clan_war(our_war_tag)
-                    
-                    # Garante que 'war.clan' seja o nosso clã
-                    clan_side = war.clan if war.clan.tag == clan_tag else war.opponent
-
-                    for member in clan_side.members:
-                        if member.attacks:
-                            attack = member.attacks[0]
-                            all_attacks_data.append({
-                                'Tag do Jogador': member.tag, 'Nome': member.name,
-                                'Dia da Guerra': war_day, 'Estrelas': attack.stars
-                            })
+                for member in clan_side.members:
+                    if member.attacks:
+                        attack = member.attacks[0]
+                        all_attacks_data.append({
+                            'Tag do Jogador': member.tag,
+                            'Nome': member.name,
+                            'Dia da Guerra': war_day,
+                            'Estrelas': attack.stars
+                        })
             
             if not all_attacks_data:
-                return pd.DataFrame(), group.season # Retorna DF vazio se não houver ataques
+                return pd.DataFrame(), group.season
 
-            # Processamento final com Pandas
+            # O resto da lógica de processamento com Pandas continua a mesma
             df_attacks = pd.DataFrame(all_attacks_data)
             summary = df_attacks.groupby(['Tag do Jogador', 'Nome']).agg(
                 Total_Estrelas=('Estrelas', 'sum'),
@@ -162,12 +166,11 @@ def get_cwl_data(clan_tag, coc_email, coc_password):
             ).reset_index()
 
             summary['Media_Estrelas'] = (summary['Total_Estrelas'] / summary['Ataques_Feitos']).round(2)
-            total_guerras = df_attacks['Dia da Guerra'].nunique()
-            summary['Guerras_Ausente'] = total_guerras - summary['Ataques_Feitos']
+            total_guerras_registradas = df_attacks['Dia da Guerra'].nunique()
+            summary['Guerras_Ausente'] = total_guerras_registradas - summary['Ataques_Feitos']
             
             summary = summary.sort_values(by='Total_Estrelas', ascending=False)
             
-            # Renomeia colunas para o relatório
             summary.rename(columns={
                 'Nome': 'Nome do Jogador', 'Total_Estrelas': 'Total de Estrelas',
                 'Ataques_Feitos': 'Ataques Feitos', 'Media_Estrelas': 'Média de Estrelas',
@@ -180,7 +183,8 @@ def get_cwl_data(clan_tag, coc_email, coc_password):
             raise e
         finally:
             await client.close()
-
+            
     return asyncio.run(_fetch_cwl())
+
 
 
