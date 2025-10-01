@@ -107,3 +107,13 @@ def get_top_war_performers(limit=5):
         )
         
         return df_summary.head(5)
+
+def is_war_saved(war_id):
+    """Verifica se uma guerra com um ID específico já foi salva no banco."""
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        # SELECT EXISTS é uma forma eficiente de checar se um registro existe
+        cursor.execute("SELECT EXISTS(SELECT 1 FROM wars WHERE war_id = ?)", (war_id,))
+        exists = cursor.fetchone()[0]
+        return exists == 1
+
