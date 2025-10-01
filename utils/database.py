@@ -3,6 +3,7 @@
 import sqlite3
 import pandas as pd
 import json
+from collections import defaultdict
 
 DB_FILE = "clash_history.db"
 
@@ -77,4 +78,48 @@ def get_war_by_id(war_id):
                 "opponent_stars": war_data[3], "clan_destruction": war_data[4]
             }
             return summary, df_attacks
+
     return None, None
+
+def get_top_war_performers(limit=5):
+    """
+    Busca as últimas 'limit' guerras do histórico, calcula o desempenho
+    agregado de cada jogador e retorna o ranking dos 5 melhores.
+    """
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        # 1. Busca o JSON das últimas 5 guerras salvas
+        cursor.execute("SELECT data_json FROM wars ORDER BY war_date DESC LIMIT ?", (limit,))
+        war_data = cursor.fetchall()
+        
+        if not war_data:
+            return pd.DataFrame()
+
+        # 2. Agrega os dados de todos os jogadores em todas as guerras
+        player_stats = defaultdict(lambda: {'Total Estrelas': 0, 'Total Destruição': 0, 'Total Duração': 0})
+        
+        for war_row in war_data:
+            df_war = pd.read_json(war_row[0], orient='split')
+            for _, player_row in df_war.iterrows():
+                player_name = player_row['Nome']
+                player_stats[player_name]['Total Estrelas'] += player_row['Estrelas Totais']
+                # Remove o '%' e converte para número antes de somar
+                player_stats[player_name]['Total Destruição'] += int(str(player_row['Destruição Total']).replace('%', ''))
+                player_stats[player_name]['Total Duração'] += player_row['Duração Total (s)']
+        
+        if not player_stats:
+            return pd.DataFrame()
+
+        # 3. Converte os dados agregados para um DataFrame
+        df_summary = pd.DataFrame.from_dict(player_stats, orient='index')
+        df_summary.reset_index(inplace=True)
+        df_summary.rename(columns={'index': 'Nome'}, inplace=True)
+
+        # 4. Ordena pelo critério de desempate: Estrelas > Destruição > Duração (menor é melhor)
+        df_summary = df_summary.sort_values(
+            by=['Total Estrelas', 'Total Destruição', 'Total Duração'],
+            ascending=[False, False, True] # Estrelas (DESC), Destruição (DESC), Duração (ASC)
+        )
+        
+        # 5. Retorna o Top 5 do ranking
+        return df_summary.head(5)
