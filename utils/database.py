@@ -1,9 +1,10 @@
-# Conteúdo NOVO E FINAL de utils/database.py
+# Conteúdo COMPLETO e CORRIGIDO de utils/database.py
 
 import streamlit as st
 import pandas as pd
 import json
-import psycopg2 # Nova biblioteca para PostgreSQL
+import psycopg2
+from collections import defaultdict
 
 def get_db_connection():
     """Cria e retorna uma conexão com o banco de dados PostgreSQL usando os segredos."""
@@ -34,21 +35,26 @@ def save_war_data(war_summary, df_attacks, war_end_time_iso):
     
     with get_db_connection() as conn:
         with conn.cursor() as cursor:
-            # ON CONFLICT previne duplicatas, é o equivalente do 'INSERT OR IGNORE'
             cursor.execute("""
                 INSERT INTO wars (war_id, opponent_name, clan_stars, opponent_stars, clan_destruction, data_json, war_date)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (war_id) DO NOTHING
             """, (
-                war_end_time_iso,
-                war_summary['opponent_name'],
-                war_summary['clan_stars'],
-                war_summary['opponent_stars'],
-                war_summary['clan_destruction'],
-                df_json,
-                war_date_formatted
+                war_end_time_iso, war_summary['opponent_name'], war_summary['clan_stars'],
+                war_summary['opponent_stars'], war_summary['clan_destruction'],
+                df_json, war_date_formatted
             ))
         conn.commit()
+
+# --- FUNÇÃO QUE ESTAVA FALTANDO ---
+def is_war_saved(war_id):
+    """Verifica se uma guerra com um ID específico já foi salva no banco."""
+    with get_db_connection() as conn:
+        with conn.cursor() as cursor:
+            # SELECT EXISTS é uma forma eficiente de checar se um registro existe
+            cursor.execute("SELECT EXISTS(SELECT 1 FROM wars WHERE war_id = %s)", (war_id,))
+            exists = cursor.fetchone()[0]
+            return exists == 1
 
 def get_war_history_list():
     """Retorna uma lista de todas as guerras salvas."""
@@ -61,7 +67,6 @@ def get_war_by_id(war_id):
     """Busca os dados de uma guerra específica."""
     with get_db_connection() as conn:
         with conn.cursor() as cursor:
-            # Note a mudança de '?' para '%s'
             cursor.execute("SELECT * FROM wars WHERE war_id = %s", (war_id,))
             war_data = cursor.fetchone()
             if war_data:
@@ -80,12 +85,9 @@ def get_top_war_performers(limit=5):
             cursor.execute("SELECT data_json FROM wars ORDER BY war_date DESC LIMIT %s", (limit,))
             war_data = cursor.fetchall()
             
-            # O resto desta função continua exatamente igual, pois a lógica é em Pandas
-            if not war_data:
-                return pd.DataFrame()
+            if not war_data: return pd.DataFrame()
 
             player_stats = defaultdict(lambda: {'Total Estrelas': 0, 'Total Destruição': 0, 'Total Duração': 0})
-            from collections import defaultdict # Adicionado import aqui para garantir
             
             for war_row in war_data:
                 df_war = pd.read_json(war_row[0], orient='split')
@@ -93,7 +95,7 @@ def get_top_war_performers(limit=5):
                     player_name = player_row['Nome']
                     player_stats[player_name]['Total Estrelas'] += player_row['Estrelas Totais']
                     player_stats[player_name]['Total Destruição'] += int(str(player_row['Destruição Total']).replace('%', ''))
-                    player_stats[player_name]['Total Duração'] += player_row['Duração Total (s)']
+                    player_stats[player_name]['Duração Total (s)'] += player_row['Duração Total (s)']
             
             if not player_stats: return pd.DataFrame()
             df_summary = pd.DataFrame.from_dict(player_stats, orient='index').reset_index().rename(columns={'index': 'Nome'})
