@@ -35,7 +35,8 @@ def get_clan_data(clan_tag, coc_email, coc_password):
 @st.cache_data(ttl="5m")
 def get_current_war_data(clan_tag, coc_email, coc_password):
     """
-    Função assíncrona para buscar dados detalhados da guerra atual.
+    Função assíncrona para buscar dados detalhados da guerra atual,
+    incluindo destruição e duração dos ataques.
     """
     async def _fetch_war():
         client = coc.Client()
@@ -52,46 +53,60 @@ def get_current_war_data(clan_tag, coc_email, coc_password):
 
             for member in war.clan.members:
                 ataques_feitos = len(member.attacks)
-                estrelas_atk1, cv_inimigo_atk1 = 0, "-" 
-                estrelas_atk2, cv_inimigo_atk2 = 0, "-"
+                # Inicializa todas as variáveis numéricas como 0
+                estrelas_atk1, cv_inimigo_atk1, destruicao_atk1, duracao_atk1 = 0, "-", 0, 0
+                estrelas_atk2, cv_inimigo_atk2, destruicao_atk2, duracao_atk2 = 0, "-", 0, 0
 
                 if ataques_feitos >= 1:
                     atk1 = member.attacks[0]
                     estrelas_atk1 = atk1.stars
+                    destruicao_atk1 = atk1.destruction  # <-- Captura a destruição
+                    duracao_atk1 = atk1.duration      # <-- Captura a duração
                     inimigo1 = opponent_map.get(atk1.defender_tag)
                     if inimigo1: cv_inimigo_atk1 = inimigo1.town_hall
                 
                 if ataques_feitos == 2:
                     atk2 = member.attacks[1]
                     estrelas_atk2 = atk2.stars
+                    destruicao_atk2 = atk2.destruction  # <-- Captura a destruição
+                    duracao_atk2 = atk2.duration      # <-- Captura a duração
                     inimigo2 = opponent_map.get(atk2.defender_tag)
                     if inimigo2: cv_inimigo_atk2 = inimigo2.town_hall
 
                 attacks_data.append({
-                    # <<<--- NOVA INFORMAÇÃO ADICIONADA AQUI ---<<<
                     'Posição': member.map_position,
                     'Nome': member.name, 
                     'Ataques Feitos': ataques_feitos,
-                    'Estrelas Atk 1': estrelas_atk1 if ataques_feitos >=1 else "-",
+                    'Estrelas Atk 1': estrelas_atk1,
                     'CV Inimigo Atk 1': cv_inimigo_atk1,
-                    'Estrelas Atk 2': estrelas_atk2 if ataques_feitos == 2 else "-",
-                    'CV Inimigo Atk 2': cv_inimigo_atk2
+                    'Estrelas Atk 2': estrelas_atk2,
+                    'CV Inimigo Atk 2': cv_inimigo_atk2,
+                    # Adiciona os dados brutos que acabamos de capturar
+                    'Destruição Atk 1': destruicao_atk1,
+                    'Duração Atk 1 (s)': duracao_atk1,
+                    'Destruição Atk 2': destruicao_atk2,
+                    'Duração Atk 2 (s)': duracao_atk2
                 })
             
             df_attacks = pd.DataFrame(attacks_data)
             
-            df_attacks['Estrelas Totais'] = df_attacks['Estrelas Atk 1'].replace('-', 0).astype(int) + \
-                                          df_attacks['Estrelas Atk 2'].replace('-', 0).astype(int)
+            # --- CÁLCULOS E FORMATAÇÃO DAS NOVAS COLUNAS ---
+            df_attacks['Estrelas Totais'] = df_attacks['Estrelas Atk 1'] + df_attacks['Estrelas Atk 2']
+            df_attacks['Destruição Total'] = df_attacks['Destruição Atk 1'] + df_attacks['Destruição Atk 2']
             
-            # <<<--- ORDEM DAS COLUNAS ATUALIZADA ---<<<
+            # Formata as colunas de destruição para exibição com "%"
+            # E mostra "-" se o ataque não aconteceu (valor 0)
+            for col in ['Destruição Atk 1', 'Destruição Atk 2', 'Destruição Total']:
+                df_attacks[col] = df_attacks[col].apply(lambda x: f"{x}%" if x > 0 else ("-" if col != 'Destruição Total' else "0%"))
+
+            # Reorganiza as colunas para a nova ordem desejada
             ordem_colunas = [
                 'Posição', 'Nome', 'Ataques Feitos', 'Estrelas Totais', 'Estrelas Atk 1', 
-                'CV Inimigo Atk 1', 'Estrelas Atk 2', 'CV Inimigo Atk 2'
+                'CV Inimigo Atk 1', 'Estrelas Atk 2', 'CV Inimigo Atk 2',
+                'Destruição Total', 'Duração Atk 1 (s)', 'Duração Atk 2 (s)' # <-- Novas colunas no final
             ]
             df_attacks = df_attacks[ordem_colunas]
             
-            # <<<--- ORDENAÇÃO ATUALIZADA ---<<<
-            # Agora a tabela virá ordenada pela Posição no Mapa, do 1 para o último
             df_attacks = df_attacks.sort_values(by='Posição', ascending=True)
             
             war_summary = {
@@ -107,7 +122,6 @@ def get_current_war_data(clan_tag, coc_email, coc_password):
             await client.close()
             
     return asyncio.run(_fetch_war())
-
 
 # --- NOVA FUNÇÃO PARA DADOS DA LIGA DE CLÃS (CWL) ---
 @st.cache_data(ttl="2h") # Cache maior, pois os dados da CWL são mais estáveis
@@ -173,3 +187,4 @@ def get_cwl_data(clan_tag, coc_email, coc_password):
             await client.close()
 
     return asyncio.run(_fetch_cwl())
+
