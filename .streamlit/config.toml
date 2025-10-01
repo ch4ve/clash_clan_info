@@ -1,0 +1,22 @@
+# Conteúdo de .streamlit/config.toml
+
+[theme]
+# A cor principal para os elementos interativos (botões, sliders, etc.)
+# Um dourado inspirado no ouro do jogo
+primaryColor = "#FFD700"
+
+# Cor de fundo principal do app
+# Um cinza bem escuro, quase preto
+backgroundColor = "#1a202c"
+
+# Cor de fundo para elementos como a barra lateral e caixas de seleção
+# Um cinza um pouco mais claro que o fundo principal
+secondaryBackgroundColor = "#2c3440"
+
+# Cor do texto principal
+# Um branco suave para boa legibilidade
+textColor = "#F0F2F6"
+
+# A fonte a ser usada. "sans serif" é uma escolha limpa e moderna.
+# Você pode experimentar "serif" ou "monospace" também.
+font = "sans serif"
