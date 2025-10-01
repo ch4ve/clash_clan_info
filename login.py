@@ -18,7 +18,7 @@ st.image("search_clans.png")
 st.header("Qual clã você deseja analisar?")
 
 # Campo para o usuário inserir a tag do clã
-clan_tag = st.text_input("Insira a tag do clã (ex: #9RG00UY9)")
+clan_tag = st.text_input("Insira a tag do clã ", value="#9RG00UY9")
 
 if st.button("Analisar Clã"):
     if clan_tag:
@@ -28,4 +28,5 @@ if st.button("Analisar Clã"):
         # Redireciona o usuário para a primeira página de informações
         st.switch_page("pages/1_ℹ️_Info_Clã.py")
     else:
+
         st.error("Por favor, insira uma tag de clã.")
