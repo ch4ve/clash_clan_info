@@ -1,5 +1,6 @@
 # Conteúdo atualizado de pages/1_ℹ️_Info_Clã.py
 
+import pandas as pd
 import streamlit as st
 from utils.coc_api import get_clan_data
 # Importamos nossa nova função de ranking!
@@ -64,3 +65,4 @@ if 'clan_tag' in st.session_state and st.session_state['clan_tag']:
 else:
     st.warning("🔒 Por favor, faça o login para visualizar as informações do clã.")
     st.page_link("app.py", label="Ir para a página de Login", icon="🔑")
+
