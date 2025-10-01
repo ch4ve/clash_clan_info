@@ -119,72 +119,67 @@ def get_current_war_data(clan_tag, coc_email, coc_password):
     return asyncio.run(_fetch_war())
 
 # --- NOVA FUNÇÃO PARA DADOS DA LIGA DE CLÃS (CWL) ---
-@st.cache_data(ttl="2h")
-def get_cwl_data(clan_tag, coc_email, coc_password):
+# --- NOVA FUNÇÃO PARA DETALHES DA GUERRA DO DIA NA CWL ---
+@st.cache_data(ttl="5m") # Cache curto para dados que podem mudar (ataques)
+def get_cwl_current_war_details(clan_tag, coc_email, coc_password):
     """
-    Busca e consolida todos os dados de ataque da CWL atual,
-    usando o método correto para a v3.9.1 da biblioteca.
+    Busca os detalhes da guerra ATUAL da CWL, incluindo o mapa de guerra
+    de ambos os clãs (jogadores, CVs, posições).
     """
-    async def _fetch_cwl():
+    async def _fetch_cwl_war():
         client = coc.Client()
         try:
             await client.login(coc_email, coc_password)
             
             try:
-                # 1. Usando a função correta: get_league_group()
                 group = await client.get_league_group(clan_tag)
             except coc.NotFound:
-                return None, None 
+                return None, None, None
 
-            all_attacks_data = []
+            # Usamos o get_wars() para pegar a guerra do round atual
+            async for war in group.get_wars(cwl_round=coc.WarRound.current_war):
+                if war.clan.tag == clan_tag or war.opponent.tag == clan_tag:
+                    # Achamos a nossa guerra do dia!
+                    
+                    # Garante que 'clan_side' é o nosso clã e 'opponent_side' é o inimigo
+                    clan_side = war.clan if war.clan.tag == clan_tag else war.opponent
+                    opponent_side = war.opponent if war.clan.tag == clan_tag else war.clan
+
+                    # Monta o DataFrame do nosso clã
+                    clan_members_data = [{
+                        'Pos.': member.map_position,
+                        'Nome': member.name,
+                        'CV': member.town_hall
+                    } for member in clan_side.members]
+                    df_clan = pd.DataFrame(clan_members_data).sort_values(by='Pos.')
+
+                    # Monta o DataFrame do oponente
+                    opponent_members_data = [{
+                        'Pos.': member.map_position,
+                        'Nome': member.name,
+                        'CV': member.town_hall
+                    } for member in opponent_side.members]
+                    df_opponent = pd.DataFrame(opponent_members_data).sort_values(by='Pos.')
+
+                    war_summary = {
+                        "opponent_name": opponent_side.name,
+                        "state": war.state,
+                        "start_time": war.start_time,
+                        "end_time": war.end_time
+                    }
+                    
+                    return war_summary, df_clan, df_opponent
             
-            # 2. Usando o método mais simples para iterar sobre as guerras do clã
-            war_day = 0
-            async for war in group.get_wars_for_clan(clan_tag):
-                war_day += 1
-                # Garante que 'clan_side' seja o nosso clã
-                clan_side = war.clan if war.clan.tag == clan_tag else war.opponent
-
-                for member in clan_side.members:
-                    if member.attacks:
-                        attack = member.attacks[0]
-                        all_attacks_data.append({
-                            'Tag do Jogador': member.tag,
-                            'Nome': member.name,
-                            'Dia da Guerra': war_day,
-                            'Estrelas': attack.stars
-                        })
-            
-            if not all_attacks_data:
-                return pd.DataFrame(), group.season
-
-            # O resto da lógica de processamento com Pandas continua a mesma
-            df_attacks = pd.DataFrame(all_attacks_data)
-            summary = df_attacks.groupby(['Tag do Jogador', 'Nome']).agg(
-                Total_Estrelas=('Estrelas', 'sum'),
-                Ataques_Feitos=('Estrelas', 'size')
-            ).reset_index()
-
-            summary['Media_Estrelas'] = (summary['Total_Estrelas'] / summary['Ataques_Feitos']).round(2)
-            total_guerras_registradas = df_attacks['Dia da Guerra'].nunique()
-            summary['Guerras_Ausente'] = total_guerras_registradas - summary['Ataques_Feitos']
-            
-            summary = summary.sort_values(by='Total_Estrelas', ascending=False)
-            
-            summary.rename(columns={
-                'Nome': 'Nome do Jogador', 'Total_Estrelas': 'Total de Estrelas',
-                'Ataques_Feitos': 'Ataques Feitos', 'Media_Estrelas': 'Média de Estrelas',
-                'Guerras_Ausente': 'Guerras Ausente'
-            }, inplace=True)
-
-            return summary, group.season
+            # Se o loop terminar e não acharmos a guerra
+            return None, None, None
 
         except Exception as e:
             raise e
         finally:
             await client.close()
-            
-    return asyncio.run(_fetch_cwl())
+
+    # Adicionamos o asyncio.run() para compatibilidade com a v3.9.1
+    return asyncio.get_event_loop().run_until_complete(_fetch_cwl_war())
 
 
 
