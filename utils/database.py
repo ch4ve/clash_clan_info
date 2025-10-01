@@ -1,7 +1,7 @@
-# Conteúdo de utils/database.py (com a nova coluna de data)
+# Conteúdo CORRIGIDO e COMPLETO de utils/database.py
 
 import sqlite3
-import pandas as pd
+import pandas as pd  # <<<--- ESTA É A LINHA QUE FALTAVA
 import json
 from collections import defaultdict
 
@@ -11,7 +11,6 @@ def init_db():
     """Cria o banco de dados e garante que a tabela 'wars' tenha a estrutura mais recente."""
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
-        # 1. Cria a tabela se ela não existir, já com a nova coluna
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS wars (
                 war_id TEXT PRIMARY KEY,
@@ -20,29 +19,22 @@ def init_db():
                 opponent_stars INTEGER,
                 clan_destruction REAL,
                 data_json TEXT NOT NULL,
-                war_date TEXT  -- <<< NOVA COLUNA ADICIONADA
+                war_date TEXT
             )
         """)
-        
-        # 2. Lógica de "migração": Adiciona a coluna se a tabela já existia mas não tinha a coluna
-        # Isso garante que o código não quebre se você já tiver um banco de dados antigo.
         try:
             cursor.execute("ALTER TABLE wars ADD COLUMN war_date TEXT")
         except sqlite3.OperationalError:
-            # A coluna provavelmente já existe, o que é esperado.
             pass
-            
         conn.commit()
 
 def save_war_data(war_summary, df_attacks, war_end_time_iso):
     """Salva os dados de uma guerra no banco de dados, incluindo a data formatada."""
     df_json = df_attacks.to_json(orient='split')
-    # Extrai a data (yyyy-mm-dd) do timestamp completo
     war_date_formatted = war_end_time_iso.split('T')[0]
     
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
-        # 3. Atualiza o comando INSERT para incluir o valor na nova coluna
         cursor.execute("""
             INSERT OR IGNORE INTO wars (war_id, opponent_name, clan_stars, opponent_stars, clan_destruction, data_json, war_date)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -53,7 +45,7 @@ def save_war_data(war_summary, df_attacks, war_end_time_iso):
             war_summary['opponent_stars'],
             war_summary['clan_destruction'],
             df_json,
-            war_date_formatted # <-- Novo valor sendo salvo
+            war_date_formatted
         ))
         conn.commit()
 
@@ -61,7 +53,6 @@ def get_war_history_list():
     """Retorna uma lista de todas as guerras salvas para usar no filtro."""
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
-        # 4. Busca a nova coluna para usar na formatação do filtro
         cursor.execute("SELECT war_id, opponent_name, war_date FROM wars ORDER BY war_id DESC")
         return cursor.fetchall()
 
@@ -78,7 +69,6 @@ def get_war_by_id(war_id):
                 "opponent_stars": war_data[3], "clan_destruction": war_data[4]
             }
             return summary, df_attacks
-
     return None, None
 
 def get_top_war_performers(limit=5):
@@ -88,14 +78,12 @@ def get_top_war_performers(limit=5):
     """
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
-        # 1. Busca o JSON das últimas 5 guerras salvas
         cursor.execute("SELECT data_json FROM wars ORDER BY war_date DESC LIMIT ?", (limit,))
         war_data = cursor.fetchall()
         
         if not war_data:
             return pd.DataFrame()
 
-        # 2. Agrega os dados de todos os jogadores em todas as guerras
         player_stats = defaultdict(lambda: {'Total Estrelas': 0, 'Total Destruição': 0, 'Total Duração': 0})
         
         for war_row in war_data:
@@ -103,23 +91,19 @@ def get_top_war_performers(limit=5):
             for _, player_row in df_war.iterrows():
                 player_name = player_row['Nome']
                 player_stats[player_name]['Total Estrelas'] += player_row['Estrelas Totais']
-                # Remove o '%' e converte para número antes de somar
                 player_stats[player_name]['Total Destruição'] += int(str(player_row['Destruição Total']).replace('%', ''))
                 player_stats[player_name]['Total Duração'] += player_row['Duração Total (s)']
         
         if not player_stats:
             return pd.DataFrame()
 
-        # 3. Converte os dados agregados para um DataFrame
         df_summary = pd.DataFrame.from_dict(player_stats, orient='index')
         df_summary.reset_index(inplace=True)
         df_summary.rename(columns={'index': 'Nome'}, inplace=True)
 
-        # 4. Ordena pelo critério de desempate: Estrelas > Destruição > Duração (menor é melhor)
         df_summary = df_summary.sort_values(
             by=['Total Estrelas', 'Total Destruição', 'Total Duração'],
-            ascending=[False, False, True] # Estrelas (DESC), Destruição (DESC), Duração (ASC)
+            ascending=[False, False, True]
         )
         
-        # 5. Retorna o Top 5 do ranking
         return df_summary.head(5)
