@@ -52,7 +52,6 @@ def get_current_war_data(clan_tag, coc_email, coc_password):
 
             for member in war.clan.members:
                 ataques_feitos = len(member.attacks)
-                # Inicializamos como 0 para facilitar a soma
                 estrelas_atk1, cv_inimigo_atk1 = 0, "-" 
                 estrelas_atk2, cv_inimigo_atk2 = 0, "-"
 
@@ -69,31 +68,31 @@ def get_current_war_data(clan_tag, coc_email, coc_password):
                     if inimigo2: cv_inimigo_atk2 = inimigo2.town_hall
 
                 attacks_data.append({
+                    # <<<--- NOVA INFORMAÇÃO ADICIONADA AQUI ---<<<
+                    'Posição': member.map_position,
                     'Nome': member.name, 
                     'Ataques Feitos': ataques_feitos,
-                    'Estrelas Atk 1': estrelas_atk1 if ataques_feitos >=1 else "-", # Mostra "-" se não atacou
+                    'Estrelas Atk 1': estrelas_atk1 if ataques_feitos >=1 else "-",
                     'CV Inimigo Atk 1': cv_inimigo_atk1,
-                    'Estrelas Atk 2': estrelas_atk2 if ataques_feitos == 2 else "-", # Mostra "-" se fez só 1 atk
+                    'Estrelas Atk 2': estrelas_atk2 if ataques_feitos == 2 else "-",
                     'CV Inimigo Atk 2': cv_inimigo_atk2
                 })
             
-            # Converte para DataFrame para fazer o cálculo
             df_attacks = pd.DataFrame(attacks_data)
             
-            # <<<--- MUDANÇA PRINCIPAL AQUI ---<<<
-            # 1. Calcula a nova coluna somando as estrelas
             df_attacks['Estrelas Totais'] = df_attacks['Estrelas Atk 1'].replace('-', 0).astype(int) + \
                                           df_attacks['Estrelas Atk 2'].replace('-', 0).astype(int)
             
-            # 2. Reorganiza as colunas para a nova ordem desejada
+            # <<<--- ORDEM DAS COLUNAS ATUALIZADA ---<<<
             ordem_colunas = [
-                'Nome', 'Ataques Feitos', 'Estrelas Totais', 'Estrelas Atk 1', 
+                'Posição', 'Nome', 'Ataques Feitos', 'Estrelas Totais', 'Estrelas Atk 1', 
                 'CV Inimigo Atk 1', 'Estrelas Atk 2', 'CV Inimigo Atk 2'
             ]
             df_attacks = df_attacks[ordem_colunas]
             
-            # 3. Ordena pela nova coluna, do maior para o menor
-            df_attacks = df_attacks.sort_values(by='Estrelas Totais', ascending=False)
+            # <<<--- ORDENAÇÃO ATUALIZADA ---<<<
+            # Agora a tabela virá ordenada pela Posição no Mapa, do 1 para o último
+            df_attacks = df_attacks.sort_values(by='Posição', ascending=True)
             
             war_summary = {
                 "clan_name": war.clan.name, "opponent_name": war.opponent.name,
@@ -172,4 +171,5 @@ def get_cwl_data(clan_tag, coc_email, coc_password):
             raise e
         finally:
             await client.close()
+
     return asyncio.run(_fetch_cwl())
