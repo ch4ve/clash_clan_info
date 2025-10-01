@@ -1,4 +1,4 @@
-# Novo conteúdo de pages/2_⚔️_Guerra_Atual.py
+# Conteúdo corrigido de pages/2_⚔️_Guerra_Atual.py
 
 import streamlit as st
 from utils.coc_api import get_current_war_data
@@ -9,16 +9,16 @@ init_db()
 st.set_page_config(page_title="Guerra Atual", page_icon="⚔️", layout="wide")
 st.title("⚔️ Análise da Guerra Atual")
 
-# Verifica se uma tag de clã foi inserida na página principal
 if 'clan_tag' in st.session_state and st.session_state['clan_tag']:
     try:
-        # Pega a tag da memória e as credenciais dos segredos
         clan_tag = st.session_state['clan_tag']
         coc_email = st.secrets["coc_email"]
         coc_password = st.secrets["coc_password"]
 
         with st.spinner("Buscando dados da guerra atual..."):
-            df_war, war_summary, war_state, war_end_time = get_current_war_data(clan_tag, coc_email, coc_password)
+            # --- CORREÇÃO APLICADA AQUI ---
+            # Ajustamos a linha para receber as 5 informações que a função retorna
+            df_full_data, df_display_data, war_summary, war_state, war_end_time = get_current_war_data(clan_tag, coc_email, coc_password)
             
             if war_state is None:
                 st.info(f"O clã ({clan_tag}) não está em uma guerra no momento.")
@@ -34,18 +34,18 @@ if 'clan_tag' in st.session_state and st.session_state['clan_tag']:
 
                 if war_state == 'warEnded':
                     if st.button("Salvar Resultado desta Guerra no Histórico"):
-                        save_war_data(war_summary, df_war, war_end_time.time.isoformat())
+                        # Usamos o DataFrame completo (df_full_data) para salvar
+                        save_war_data(war_summary, df_full_data, war_end_time.time.isoformat())
                         st.balloons()
                         st.success("Guerra salva com sucesso no histórico!")
                 
                 st.header("Tabela de Ataques")
-                st.dataframe(df_war, hide_index=True)
+                # Exibimos o DataFrame limpo (df_display_data)
+                st.dataframe(df_display_data, hide_index=True)
 
     except Exception as e:
         st.error(f"Erro ao buscar dados da API: {e}")
 
 else:
-    # Se nenhuma tag foi definida, instrui o usuário a voltar
     st.warning("⬅️ Por favor, insira uma tag de clã na página principal para começar.")
     st.page_link("app.py", label="Ir para a página principal", icon="🏠")
-
