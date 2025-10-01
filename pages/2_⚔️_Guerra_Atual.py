@@ -39,7 +39,7 @@ if 'clan_tag' in st.session_state and st.session_state['clan_tag']:
                         st.success("Guerra salva com sucesso no histórico!")
                 
                 st.header("Tabela de Ataques")
-                st.dataframe(df_war)
+                st.dataframe(df_war, hide_index=True)
 
     except Exception as e:
         st.error(f"Erro ao buscar dados da API: {e}")
@@ -48,3 +48,4 @@ else:
     # Se nenhuma tag foi definida, instrui o usuário a voltar
     st.warning("⬅️ Por favor, insira uma tag de clã na página principal para começar.")
     st.page_link("app.py", label="Ir para a página principal", icon="🏠")
+
