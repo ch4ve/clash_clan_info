@@ -137,7 +137,7 @@ def get_cwl_current_war_details(clan_tag, coc_email, coc_password):
     # Linha Corrigida
     return asyncio.run(_fetch_cwl_war())
 
-@st.cache_data(ttl="6h") # O cronograma da CWL é fixo, então podemos usar um cache longo
+@st.cache_data(ttl="6h")
 def get_cwl_schedule(clan_tag, coc_email, coc_password):
     """
     Busca o grupo da CWL e monta um cronograma com os oponentes de cada dia.
@@ -151,21 +151,17 @@ def get_cwl_schedule(clan_tag, coc_email, coc_password):
             except coc.NotFound:
                 return None
 
-            # Cria um mapa de tag -> nome para todos os clãs do grupo
             clan_map = {c.tag: c.name for c in group.clans}
             
             schedule = []
-            # Itera sobre cada round (dia) da liga
-            for war_day, round_data in enumerate(group.rounds, 1):
-                # Encontra a tag de guerra que inclui nosso clã
-                our_war_tag = next((tag for tag in round_data.war_tags if clan_tag in tag), None)
+            for war_day, round_tags_list in enumerate(group.rounds, 1): # round_tags_list é a lista de tags do dia
+                
+                # --- CORREÇÃO APLICADA AQUI ---
+                # Iteramos diretamente sobre a lista de tags (round_tags_list)
+                our_war_tag = next((tag for tag in round_tags_list if clan_tag in tag), None)
                 
                 if our_war_tag:
-                    # As tags de guerra são no formato '#TAG1v#TAG2'
-                    # Removemos o '#' e dividimos no 'v' para obter as duas tags
                     tags = our_war_tag.replace("#", "").split("v")
-                    
-                    # O oponente é a tag que não é a nossa
                     opponent_tag = f"#{tags[1]}" if tags[0] == clan_tag.replace("#","") else f"#{tags[0]}"
                     
                     schedule.append({
@@ -179,4 +175,5 @@ def get_cwl_schedule(clan_tag, coc_email, coc_password):
             await client.close()
 
     return asyncio.run(_fetch_schedule())
+
 
