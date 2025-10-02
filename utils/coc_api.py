@@ -2,10 +2,7 @@ import streamlit as st
 import pandas as pd
 import coc
 import asyncio
-from collections import defaultdict # Importa o defaultdict
-
-# Adicionei o cache de volta, pois ele é importante para a performance do app.
-# A lógica de asyncio.run() resolve o conflito, então podemos usá-lo.
+from collections import defaultdict
 
 @st.cache_data(ttl="10m")
 def get_clan_data(clan_tag, coc_email, coc_password):
@@ -14,13 +11,12 @@ def get_clan_data(clan_tag, coc_email, coc_password):
         try:
             await client.login(coc_email, coc_password)
             clan = await client.get_clan(clan_tag)
-            members_data = []
             
             async def fetch_player_data(member):
                 player = await client.get_player(member.tag)
                 hero_levels = {h.name: h.level for h in player.heroes}
                 return {
-                    'Nome': player.name, 'Cargo': player.role, 'CV': player.town_hall,
+                    'Nome': player.name, 'Cargo': player.role.name, 'CV': player.town_hall,
                     'Liga': player.league.name if player.league else 'Sem Liga', 'Troféus': player.trophies,
                     'Rei Bárbaro': hero_levels.get('Barbarian King', 0), 'Rainha Arqueira': hero_levels.get('Archer Queen', 0),
                     'Grande Guardião': hero_levels.get('Grand Warden', 0), 'Campeã Real': hero_levels.get('Royal Champion', 0)
@@ -33,6 +29,7 @@ def get_clan_data(clan_tag, coc_email, coc_password):
         finally:
             await client.close()
     return asyncio.run(_fetch())
+
 
 @st.cache_data(ttl="5m")
 def get_current_war_data(clan_tag, coc_email, coc_password):
@@ -65,7 +62,7 @@ def get_current_war_data(clan_tag, coc_email, coc_password):
             df_attacks['Estrelas Totais'] = df_attacks['Estrelas Atk 1'] + df_attacks['Estrelas Atk 2']
             df_attacks['Destruição Total'] = df_attacks['Destruição Atk 1'] + df_attacks['Destruição Atk 2']
             df_attacks['Duração Total (s)'] = df_attacks['Duração Atk 1 (s)'] + df_attacks['Duração Atk 2 (s)']
-            df_display = df_attacks.copy() # Cria uma cópia para exibição
+            df_display = df_attacks.copy()
             df_display['Destruição Total'] = df_display['Destruição Total'].apply(lambda x: f"{x}%")
             colunas_para_remover = ['Destruição Atk 1', 'Duração Atk 1 (s)', 'Destruição Atk 2', 'Duração Atk 2 (s)']
             df_display = df_display.drop(columns=colunas_para_remover)
@@ -87,7 +84,7 @@ def get_cwl_data(clan_tag, coc_email, coc_password):
             try:
                 group = await client.get_league_group(clan_tag)
             except coc.NotFound:
-                return None, None 
+                return None, None
             all_attacks_data = []
             war_day = 0
             async for war in group.get_wars_for_clan(clan_tag):
@@ -118,84 +115,25 @@ def get_cwl_current_war_details(clan_tag, coc_email, coc_password):
         try:
             await client.login(coc_email, coc_password)
             try:
-                # Usamos a tag fornecida, que pode ser a nossa ou a do inimigo
-                group = await client.get_league_group(clan_tag) 
+                group = await client.get_league_group(clan_tag)
             except coc.NotFound:
                 return None, None, None, None, None
-
-            # Procura por guerra em preparação
             async for war in group.get_wars(cwl_round=coc.WarRound.preparation):
                 if clan_tag in war.tags:
-                    # (A lógica de processamento é a mesma, mas agora retornamos as tags)
                     clan_side = war.clan if war.clan.tag == clan_tag else war.opponent
                     opponent_side = war.opponent if war.clan.tag == clan_tag else war.clan
-                    # ... (código para criar df_clan e df_opponent) ...
+                    clan_members_data = [{'Pos.': m.map_position, 'Nome': m.name, 'CV': m.town_hall} for m in clan_side.members]
+                    df_clan = pd.DataFrame(clan_members_data).sort_values(by='Pos.')
+                    opponent_members_data = [{'Pos.': m.map_position, 'Nome': m.name, 'CV': m.town_hall} for m in opponent_side.members]
+                    df_opponent = pd.DataFrame(opponent_members_data).sort_values(by='Pos.')
                     war_summary = {"opponent_name": opponent_side.name, "state": war.state, "start_time": war.start_time, "end_time": war.end_time}
                     return war_summary, df_clan, df_opponent, clan_side.tag, opponent_side.tag
-
-            # Se não achou, procura por guerra em andamento
             async for war in group.get_wars(cwl_round=coc.WarRound.current_war):
                 if clan_tag in war.tags:
-                    # (Mesma lógica de processamento)
                     clan_side = war.clan if war.clan.tag == clan_tag else war.opponent
                     opponent_side = war.opponent if war.clan.tag == clan_tag else war.clan
-                    # ... (código para criar df_clan e df_opponent) ...
-                    war_summary = {"opponent_name": opponent_side.name, "state": war.state, "start_time": war.start_time, "end_time": war.end_time}
-                    return war_summary, df_clan, df_opponent, clan_side.tag, opponent_side.tag
-            
-            return None, None, None, None, None
-        finally:
-            await client.close()
-    return asyncio.run(_fetch_cwl_war())
-
-@st.cache_data(ttl="6h")
-def get_cwl_schedule(clan_tag, coc_email, coc_password):
-    # (Esta função continua a mesma de antes)
-    # ...
-
-# --- NOVA FUNÇÃO "MESTRA" DE ESPIONAGEM ---
-@st.cache_data(ttl="5m")
-def get_scouting_report(our_clan_tag, coc_email, coc_password):
-    # 1. Pega o cronograma para saber quem é o próximo oponente
-    df_schedule, _ = get_cwl_schedule(our_clan_tag, coc_email, coc_password)
-    if df_schedule is None or df_schedule.empty:
-        return None, None, "Não foi possível carregar o cronograma."
-
-    # 2. Pega os detalhes da NOSSA guerra de hoje para saber nosso dia atual e nossa escalação
-    our_war_summary, df_our_clan, _, _, _ = get_cwl_current_war_details(our_clan_tag, coc_email, coc_password)
-    if our_war_summary is None:
-        return None, None, "Não foi possível carregar nossa guerra atual."
-    
-    # Descobre qual o dia da guerra atual para achar o próximo
-    opponent_today = our_war_summary['opponent_name']
-    try:
-        current_day_row = df_schedule[df_schedule['Oponente'] == opponent_today]
-        current_day = current_day_row['Dia'].iloc[0]
-        next_day = current_day + 1
-    except IndexError:
-        return None, None, "Não foi possível determinar o dia da guerra atual no cronograma."
-
-    if next_day > 7:
-        return df_our_clan, None, "Último dia da liga, não há próximo oponente para espionar."
-    
-    # 3. Identifica o oponente de AMANHÃ
-    next_opponent_row = df_schedule[df_schedule['Dia'] == next_day]
-    if next_opponent_row.empty:
-        return None, None, f"Não foi possível encontrar o oponente do Dia {next_day}."
-        
-    next_opponent_tag = next_opponent_row['Tag do Oponente'].iloc[0]
-    next_opponent_name = next_opponent_row['Oponente'].iloc[0]
-
-    # 4. ESPIONAGEM: Busca os detalhes da guerra do oponente de amanhã
-    _, their_clan_df, their_opponent_df, their_clan_tag, their_opponent_tag = get_cwl_current_war_details(next_opponent_tag, coc_email, coc_password)
-    
-    if their_clan_df is None:
-        return None, None, f"Não foi possível carregar a guerra atual de '{next_opponent_name}'."
-        
-    # Identifica qual dos DataFrames retornados é o do nosso oponente alvo
-    df_predicted_opponent = their_clan_df if their_clan_tag == next_opponent_tag else their_opponent_df
-
-    return df_our_clan, df_predicted_opponent, next_opponent_name
-
-
-
+                    clan_members_data = [{'Pos.': m.map_position, 'Nome': m.name, 'CV': m.town_hall} for m in clan_side.members]
+                    df_clan = pd.DataFrame(clan_members_data).sort_values(by='Pos.')
+                    opponent_members_data = [{'Pos.': m.map_position, 'Nome': m.name, 'CV': m.town_hall} for m in opponent_side.members]
+                    df_opponent = pd.DataFrame(opponent_members_data).sort_values(by='Pos.')
+                    war_summary = {"opponent_name": opponent_side.name, "state": war.state, "start
