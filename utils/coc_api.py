@@ -40,6 +40,10 @@ def generate_full_league_preview(our_clan_tag, coc_email, coc_password):
         _generate_full_league_preview_async(our_clan_tag, coc_email, coc_password)
     )
 
+def get_scouting_report_async(our_clan_tag, coc_email, coc_password):
+    return loop_manager.run_coroutine(
+        _get_scouting_report_async(our_clan_tag, coc_email, coc_password):
+    )
 
 # ... (e assim por diante para todas as outras funções que você precisar)
 
@@ -182,6 +186,7 @@ async def _generate_full_league_preview_async(our_clan_tag, coc_email, coc_passw
         })
         
     return df_our_clan, league_preview
+
 
 
 
