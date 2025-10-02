@@ -34,6 +34,13 @@ def get_cwl_group_clans(clan_tag, coc_email, coc_password):
         _get_cwl_group_clans_async(clan_tag, coc_email, coc_password)
     )
 
+def generate_full_league_preview(our_clan_tag, coc_email, coc_password):
+    """Função síncrona que o Streamlit chama."""
+    return loop_manager.run_coroutine(
+        _generate_full_league_preview_async(our_clan_tag, coc_email, coc_password)
+    )
+
+
 # ... (e assim por diante para todas as outras funções que você precisar)
 
 # --- LÓGICA ASSÍNCRONA (CORE) ---
@@ -91,3 +98,48 @@ async def _get_cwl_group_clans_async(clan_tag, coc_email, coc_password):
         return group.clans
     finally:
         await client.close()
+
+# Adicione estas duas funções no final do seu arquivo utils/coc_api.py
+
+async def _generate_full_league_preview_async(our_clan_tag, coc_email, coc_password):
+    """Orquestra a coleta de dados para o mapa completo da liga."""
+    
+    # 1. Busca nossa própria escalação e a lista de todos os oponentes
+    our_war_task = asyncio.create_task(_get_cwl_current_war_details_async(our_clan_tag, coc_email, coc_password))
+    opponents_task = asyncio.create_task(_get_cwl_group_clans_async(our_clan_tag, coc_email, coc_password))
+
+    our_war_summary, df_our_clan, _, _, _ = await our_war_task
+    all_clans = await opponents_task
+
+    if df_our_clan is None or all_clans is None:
+        return None, None # Retorna se não conseguir pegar os dados iniciais
+    
+    opponents = [clan for clan in all_clans if clan.tag != our_clan_tag]
+    
+    # 2. Cria uma lista de "tarefas" para espionar cada oponente em paralelo
+    scouting_tasks = []
+    for opponent in opponents:
+        scouting_tasks.append(_get_cwl_current_war_details_async(opponent.tag, coc_email, coc_password))
+        
+    # 3. Executa todas as tarefas de espionagem ao mesmo tempo (muito mais rápido!)
+    scouting_results = await asyncio.gather(*scouting_tasks, return_exceptions=True)
+    
+    league_preview = []
+    for i, result in enumerate(scouting_results):
+        opponent_name = opponents[i].name
+        
+        # Verifica se a busca para este oponente deu erro
+        if isinstance(result, Exception) or result[0] is None:
+            df_predicted_opponent = pd.DataFrame([{"Erro": "Não foi possível carregar a guerra deste clã."}])
+        else:
+            # Extrai a escalação correta do oponente
+            _, their_clan_df, their_opponent_df, their_clan_tag, _ = result
+            df_predicted_opponent = their_clan_df if their_clan_tag == opponents[i].tag else their_opponent_df
+            
+        league_preview.append({
+            'opponent_name': opponent_name,
+            'predicted_lineup': df_predicted_opponent
+        })
+        
+    return df_our_clan, league_preview
+
