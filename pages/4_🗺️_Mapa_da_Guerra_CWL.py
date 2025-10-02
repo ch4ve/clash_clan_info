@@ -1,11 +1,11 @@
-# Conteúdo NOVO e COMPLETO de pages/5_🗺️_Mapa_da_Guerra_CWL.py
+# CONTEÚDO COMPLETO PARA SUBSTITUIR EM: pages/5_🗺️_Mapa_da_Guerra_CWL.py (ou o número que for)
 
 import streamlit as st
 from datetime import datetime, timezone
 from utils.coc_api import get_cwl_current_war_details, get_scouting_report
 
 st.set_page_config(page_title="Mapa da Guerra (CWL)", page_icon="🗺️", layout="wide")
-st.title("🗺️ Análise Estratégica da CWL")
+st.title("🗺️ Análise Estratéggica da CWL")
 
 if 'clan_tag' not in st.session_state or not st.session_state['clan_tag']:
     st.warning("⬅️ Por favor, insira uma tag de clã na página principal para começar.")
@@ -31,11 +31,13 @@ else:
             if war_summary['state'] == 'preparation':
                 start_time_aware = war_summary['start_time'].time.replace(tzinfo=timezone.utc)
                 tempo_restante = start_time_aware - now
-                st.info(f"Dia de Preparação! A guerra começa em: {str(tempo_restante).split('.')[0]}")
+                if tempo_restante.total_seconds() > 0:
+                    st.info(f"Dia de Preparação! A guerra começa em: {str(tempo_restante).split('.')[0]}")
             elif war_summary['state'] == 'inWar':
                 end_time_aware = war_summary['end_time'].time.replace(tzinfo=timezone.utc)
                 tempo_restante = end_time_aware - now
-                st.warning(f"Guerra em Andamento! Tempo restante: {str(tempo_restante).split('.')[0]}")
+                if tempo_restante.total_seconds() > 0:
+                    st.warning(f"Guerra em Andamento! Tempo restante: {str(tempo_restante).split('.')[0]}")
             
             col1, col2 = st.columns(2)
             with col1:
