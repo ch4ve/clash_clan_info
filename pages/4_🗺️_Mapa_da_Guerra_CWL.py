@@ -10,7 +10,7 @@ st.title("🗺️ Mapa da Guerra do Dia (CWL)")
 
 if 'clan_tag' not in st.session_state or not st.session_state['clan_tag']:
     st.warning("⬅️ Por favor, insira uma tag de clã na página principal para começar.")
-    st.page_link("app.py", label="Ir para a página principal", icon="🏠")
+    st.page_link("login.py", label="Ir para a página principal", icon="🏠")
 else:
     try:
         clan_tag = st.session_state['clan_tag']
@@ -64,3 +64,4 @@ else:
                 st.dataframe(df_opponent, hide_index=True)
     except Exception as e:
         st.error(f"Erro ao buscar dados da API: {e}")
+
