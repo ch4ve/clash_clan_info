@@ -222,3 +222,4 @@ def get_cwl_group_clans(clan_tag, coc_email, coc_password):
 
 
 
+
