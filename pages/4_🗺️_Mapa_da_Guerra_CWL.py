@@ -1,8 +1,9 @@
 # Conteúdo COMPLETO e ATUALIZADO de pages/5_🗺️_Mapa_da_Guerra_CWL.py
 
 import streamlit as st
+import pandas as pd
 from datetime import datetime, timezone
-# Importamos a nova função para listar os clãs
+# Importamos a função para listar os clãs
 from utils.coc_api import get_cwl_current_war_details, get_cwl_group_clans
 
 st.set_page_config(page_title="Mapa da Guerra (CWL)", page_icon="🗺️", layout="wide")
@@ -13,12 +14,27 @@ if 'clan_tag' not in st.session_state or not st.session_state['clan_tag']:
     st.page_link("app.py", label="Ir para a página principal", icon="🏠")
 else:
     try:
-        # --- BLOCO 1: GUERRA DE HOJE (Seu Clã) ---
-        st.header("Guerra de Hoje")
-        
         clan_tag = st.session_state['clan_tag']
         coc_email = st.secrets["coc_email"]
         coc_password = st.secrets["coc_password"]
+
+        # --- NOVO BLOCO: LISTA DE CLÃS DO GRUPO ---
+        with st.expander("📖 Ver todos os clãs do grupo da Liga"):
+            with st.spinner("Buscando lista de clãs..."):
+                all_clans_in_group = get_cwl_group_clans(clan_tag, coc_email, coc_password)
+                
+                if not all_clans_in_group:
+                    st.warning("Não foi possível carregar a lista de clãs do grupo.")
+                else:
+                    # Cria uma lista de dicionários para o DataFrame
+                    clans_list = [{'Nome do Clã': clan.name, 'Tag': clan.tag} for clan in all_clans_in_group]
+                    df_clans = pd.DataFrame(clans_list)
+                    st.dataframe(df_clans, hide_index=True)
+        
+        st.divider()
+
+        # --- BLOCO 2: GUERRA DE HOJE (Seu Clã) ---
+        st.header("Guerra de Hoje")
         
         with st.spinner("Buscando dados da sua guerra do dia..."):
             war_summary, df_clan, df_opponent, _, _ = get_cwl_current_war_details(clan_tag, coc_email, coc_password)
@@ -39,14 +55,11 @@ else:
 
         st.divider()
 
-        # --- BLOCO 2: ESPIONAGEM ESPECÍFICA (COM MENU DE SELEÇÃO) ---
+        # --- BLOCO 3: ESPIONAGEM ESPECÍFICA (COM MENU DE SELEÇÃO) ---
         st.header("🕵️ Espionar Guerra de Outro Clã da Liga")
 
-        # Busca a lista de todos os clãs no grupo
-        all_clans_in_group = get_cwl_group_clans(clan_tag, coc_email, coc_password)
-
         if not all_clans_in_group:
-            st.warning("Não foi possível carregar a lista de clãs do grupo da liga.")
+            st.warning("Lista de clãs indisponível para espionagem.")
         else:
             # Cria um mapa de Nome -> Tag e filtra para mostrar apenas os oponentes
             opponent_map = {clan.name: clan.tag for clan in all_clans_in_group if clan.tag != clan_tag}
