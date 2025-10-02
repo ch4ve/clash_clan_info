@@ -136,4 +136,70 @@ def get_cwl_current_war_details(clan_tag, coc_email, coc_password):
                     df_clan = pd.DataFrame(clan_members_data).sort_values(by='Pos.')
                     opponent_members_data = [{'Pos.': m.map_position, 'Nome': m.name, 'CV': m.town_hall} for m in opponent_side.members]
                     df_opponent = pd.DataFrame(opponent_members_data).sort_values(by='Pos.')
-                    war_summary = {"opponent_name": opponent_side.name, "state": war.state, "start
+                    war_summary = {"opponent_name": opponent_side.name, "state": war.state, "start_time": war.start_time, "end_time": war.end_time}
+                    return war_summary, df_clan, df_opponent, clan_side.tag, opponent_side.tag
+            return None, None, None, None, None
+        finally:
+            await client.close()
+    return asyncio.run(_fetch_cwl_war())
+
+@st.cache_data(ttl="5m")
+def get_scouting_report(our_clan_tag, coc_email, coc_password):
+    async def _scout():
+        df_schedule, _ = await asyncio.to_thread(get_cwl_schedule, our_clan_tag, coc_email, coc_password)
+        if df_schedule is None or df_schedule.empty:
+            return None, None, "Não foi possível carregar o cronograma."
+        
+        our_war_summary, df_our_clan, _, _, _ = await asyncio.to_thread(get_cwl_current_war_details, our_clan_tag, coc_email, coc_password)
+        if our_war_summary is None:
+            return None, None, "Não foi possível carregar nossa guerra atual."
+        
+        opponent_today = our_war_summary['opponent_name']
+        try:
+            current_day_row = df_schedule[df_schedule['Oponente'] == opponent_today]
+            current_day = current_day_row['Dia'].iloc[0]
+            next_day = current_day + 1
+        except IndexError:
+            return None, None, "Não foi possível determinar o dia da guerra atual no cronograma."
+        if next_day > 7:
+            return df_our_clan, None, "Último dia da liga, não há próximo oponente para espionar."
+        
+        next_opponent_row = df_schedule[df_schedule['Dia'] == next_day]
+        if next_opponent_row.empty:
+            return None, None, f"Não foi possível encontrar o oponente do Dia {next_day}."
+        
+        next_opponent_tag = next_opponent_row['Tag do Oponente'].iloc[0]
+        next_opponent_name = next_opponent_row['Oponente'].iloc[0]
+
+        _, their_clan_df, their_opponent_df, their_clan_tag, their_opponent_tag = await asyncio.to_thread(get_cwl_current_war_details, next_opponent_tag, coc_email, coc_password)
+        
+        if their_clan_df is None:
+            return None, None, f"Não foi possível carregar a guerra atual de '{next_opponent_name}'."
+        
+        df_predicted_opponent = their_clan_df if their_clan_tag == next_opponent_tag else their_opponent_df
+
+        return df_our_clan, df_predicted_opponent, next_opponent_name
+    return asyncio.run(_scout())
+
+@st.cache_data(ttl="6h")
+def get_cwl_schedule(clan_tag, coc_email, coc_password):
+    async def _fetch_schedule():
+        client = coc.Client()
+        try:
+            await client.login(coc_email, coc_password)
+            try:
+                group = await client.get_league_group(clan_tag)
+            except coc.NotFound:
+                return None, None
+            clan_map = {c.tag: c.name for c in group.clans}
+            schedule = []
+            for war_day, round_tags_list in enumerate(group.rounds, 1):
+                our_war_tag = next((tag for tag in round_tags_list if clan_tag in tag), None)
+                if our_war_tag:
+                    tags = our_war_tag.replace("#", "").split("v")
+                    opponent_tag = f"#{tags[1]}" if tags[0] == clan_tag.replace("#","") else f"#{tags[0]}"
+                    schedule.append({'Dia': war_day, 'Oponente': clan_map.get(opponent_tag, "Desconhecido"), 'Tag do Oponente': opponent_tag})
+            return pd.DataFrame(schedule), group.rounds
+        finally:
+            await client.close()
+    return asyncio.run(_fetch_schedule())
