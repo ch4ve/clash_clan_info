@@ -1,7 +1,7 @@
 # Novo conteúdo de app.py (Página de Boas-vindas)
 
 import streamlit as st
-
+from utils.loop_manager import loop_manager # <-- ADICIONE ESTA LINHA
 st.set_page_config(
     page_title="Clash Dashboard",
     page_icon="⚔️",
@@ -30,3 +30,4 @@ if st.button("Analisar Clã"):
     else:
 
         st.error("Por favor, insira uma tag de clã.")
+
