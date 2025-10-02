@@ -209,3 +209,18 @@ def get_cwl_schedule(clan_tag, coc_email, coc_password):
             await client.close()
     return asyncio.run(_fetch_schedule())
 
+@st.cache_data(ttl="12h") # A lista de clãs no grupo é fixa para a temporada
+def get_cwl_group_clans(clan_tag, coc_email, coc_password):
+    """Busca e retorna a lista de todos os clãs no grupo atual da CWL."""
+    async def _fetch_group_clans():
+        client = coc.Client()
+        try:
+            await client.login(coc_email, coc_password)
+            group = await client.get_league_group(clan_tag)
+            return group.clans
+        finally:
+            await client.close()
+            
+    return asyncio.run(_fetch_group_clans())
+
+
