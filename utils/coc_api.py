@@ -93,14 +93,51 @@ async def _get_cwl_current_war_details_async(clan_tag, coc_email, coc_password, 
         if not existing_client:
             await client.close()
 
-async def _get_cwl_group_clans_async(clan_tag, coc_email, coc_password):
+async def _get_scouting_report_async(our_clan_tag, coc_email, coc_password):
     client = coc.Client()
     try:
         await client.login(coc_email, coc_password)
+
+        # Usando o cliente já logado para todas as chamadas
+        our_war_summary, df_our_clan, _, _, _ = await _get_cwl_current_war_details_async(our_clan_tag, coc_email, coc_password, existing_client=client)
+        if our_war_summary is None:
+            return None, None, "Não foi possível carregar nossa guerra atual para determinar o dia."
+        
+        all_clans = await _get_cwl_group_clans_async(our_clan_tag, coc_email, coc_password, existing_client=client)
+        if not all_clans:
+            return None, None, "Não foi possível carregar a lista de clãs do grupo."
+            
+        opponents = [clan for clan in all_clans if clan.tag != our_clan_tag]
+        
+        # Cria as tarefas de espionagem passando o cliente existente
+        tasks = [_get_cwl_current_war_details_async(opponent.tag, coc_email, coc_password, existing_client=client) for opponent in opponents]
+        scouting_results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        league_preview = []
+        for i, result in enumerate(scouting_results):
+            opponent_name = opponents[i].name
+            if isinstance(result, Exception) or result[0] is None:
+                df_predicted_opponent = pd.DataFrame([{"Erro": "Não foi possível carregar a guerra deste clã."}])
+            else:
+                _, their_clan_df, their_opponent_df, their_clan_tag, _ = result
+                df_predicted_opponent = their_clan_df if their_clan_tag == opponents[i].tag else their_opponent_df
+            
+            league_preview.append({'opponent_name': opponent_name, 'predicted_lineup': df_predicted_opponent})
+            
+        return df_our_clan, league_preview
+    finally:
+        await client.close()
+
+async def _get_cwl_group_clans_async(clan_tag, coc_email, coc_password, existing_client=None):
+    client = existing_client or coc.Client()
+    try:
+        if not existing_client:
+            await client.login(coc_email, coc_password)
         group = await client.get_league_group(clan_tag)
         return group.clans
     finally:
-        await client.close()
+        if not existing_client:
+            await client.close()
 
 # Adicione estas duas funções no final do seu arquivo utils/coc_api.py
 
@@ -145,5 +182,6 @@ async def _generate_full_league_preview_async(our_clan_tag, coc_email, coc_passw
         })
         
     return df_our_clan, league_preview
+
 
 
