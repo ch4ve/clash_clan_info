@@ -35,4 +35,5 @@ if 'clan_tag' in st.session_state and st.session_state['clan_tag']:
 else:
     # Se não estiver logado, mostra uma mensagem
     st.warning("🔒 Por favor, faça o login na página principal para visualizar os dados da CWL.")
-    st.page_link("app.py", label="Ir para a página de Login", icon="🔑")
+    st.page_link("login.py", label="Ir para a página de Login", icon="🔑")
+
