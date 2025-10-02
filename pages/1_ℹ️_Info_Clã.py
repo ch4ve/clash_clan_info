@@ -64,5 +64,6 @@ if 'clan_tag' in st.session_state and st.session_state['clan_tag']:
 
 else:
     st.warning("🔒 Por favor, faça o login para visualizar as informações do clã.")
-    st.page_link("app.py", label="Ir para a página de Login", icon="🔑")
+    st.page_link("login.py", label="Ir para a página de Login", icon="🔑")
+
 
