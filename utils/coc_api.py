@@ -118,31 +118,36 @@ def get_cwl_current_war_details(clan_tag, coc_email, coc_password):
                 group = await client.get_league_group(clan_tag)
             except coc.NotFound:
                 return None, None, None, None, None
-            async for war in group.get_wars(cwl_round=coc.WarRound.preparation):
-                if clan_tag in war.tags:
+
+            # --- LÓGICA CORRIGIDA ---
+            # 1. Usamos o get_wars_for_clan() que sabemos que funciona
+            async for war in group.get_wars_for_clan(clan_tag):
+                # 2. Verificamos o estado da guerra manualmente
+                if war.state == 'preparation' or war.state == 'inWar':
+                    # Achamos a guerra do dia! Processa e retorna os dados.
                     clan_side = war.clan if war.clan.tag == clan_tag else war.opponent
                     opponent_side = war.opponent if war.clan.tag == clan_tag else war.clan
+
                     clan_members_data = [{'Pos.': m.map_position, 'Nome': m.name, 'CV': m.town_hall} for m in clan_side.members]
                     df_clan = pd.DataFrame(clan_members_data).sort_values(by='Pos.')
+
                     opponent_members_data = [{'Pos.': m.map_position, 'Nome': m.name, 'CV': m.town_hall} for m in opponent_side.members]
                     df_opponent = pd.DataFrame(opponent_members_data).sort_values(by='Pos.')
-                    war_summary = {"opponent_name": opponent_side.name, "state": war.state, "start_time": war.start_time, "end_time": war.end_time}
+
+                    war_summary = {
+                        "opponent_name": opponent_side.name,
+                        "state": war.state,
+                        "start_time": war.start_time,
+                        "end_time": war.end_time
+                    }
                     return war_summary, df_clan, df_opponent, clan_side.tag, opponent_side.tag
-            async for war in group.get_wars(cwl_round=coc.WarRound.current_war):
-                if clan_tag in war.tags:
-                    clan_side = war.clan if war.clan.tag == clan_tag else war.opponent
-                    opponent_side = war.opponent if war.clan.tag == clan_tag else war.clan
-                    clan_members_data = [{'Pos.': m.map_position, 'Nome': m.name, 'CV': m.town_hall} for m in clan_side.members]
-                    df_clan = pd.DataFrame(clan_members_data).sort_values(by='Pos.')
-                    opponent_members_data = [{'Pos.': m.map_position, 'Nome': m.name, 'CV': m.town_hall} for m in opponent_side.members]
-                    df_opponent = pd.DataFrame(opponent_members_data).sort_values(by='Pos.')
-                    war_summary = {"opponent_name": opponent_side.name, "state": war.state, "start_time": war.start_time, "end_time": war.end_time}
-                    return war_summary, df_clan, df_opponent, clan_side.tag, opponent_side.tag
+            
+            # 3. Se o loop terminar e não acharmos nenhuma guerra em preparação/andamento
             return None, None, None, None, None
         finally:
             await client.close()
+            
     return asyncio.run(_fetch_cwl_war())
-
 @st.cache_data(ttl="5m")
 def get_scouting_report(our_clan_tag, coc_email, coc_password):
     async def _scout():
@@ -203,3 +208,4 @@ def get_cwl_schedule(clan_tag, coc_email, coc_password):
         finally:
             await client.close()
     return asyncio.run(_fetch_schedule())
+
