@@ -55,4 +55,5 @@ if 'clan_tag' in st.session_state and st.session_state['clan_tag']:
 
 else:
     st.warning("⬅️ Por favor, insira uma tag de clã na página principal para começar.")
-    st.page_link("app.py", label="Ir para a página principal", icon="🏠")
+    st.page_link("login.py", label="Ir para a página principal", icon="🏠")
+
