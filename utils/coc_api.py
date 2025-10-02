@@ -1,46 +1,26 @@
-# CONTEÚDO COMPLETO E CORRIGIDO de utils/coc_api.py
-
-import streamlit as st
 import pandas as pd
 import coc
 import asyncio
 from collections import defaultdict
+from .loop_manager import loop_manager
 
-# --- FUNÇÕES SÍNCRONAS (WRAPPERS) ---
-# O Streamlit chama estas funções. Elas usam asyncio.run() para executar a lógica assíncrona.
-
-@st.cache_data(ttl="10m")
+# wrappers
 def get_clan_data(clan_tag, coc_email, coc_password):
-    return asyncio.run(_get_clan_data_async(clan_tag, coc_email, coc_password))
-
-@st.cache_data(ttl="5m")
+    return loop_manager.run_coroutine(_get_clan_data_async(clan_tag, coc_email, coc_password))
 def get_current_war_data(clan_tag, coc_email, coc_password):
-    return asyncio.run(_get_current_war_data_async(clan_tag, coc_email, coc_password))
-
-@st.cache_data(ttl="2h")
+    return loop_manager.run_coroutine(_get_current_war_data_async(clan_tag, coc_email, coc_password))
 def get_cwl_data(clan_tag, coc_email, coc_password):
-    return asyncio.run(_get_cwl_data_async(clan_tag, coc_email, coc_password))
-
-@st.cache_data(ttl="5m")
+    return loop_manager.run_coroutine(_get_cwl_data_async(clan_tag, coc_email, coc_password))
 def get_cwl_current_war_details(clan_tag, coc_email, coc_password):
-    return asyncio.run(_get_cwl_current_war_details_async(clan_tag, coc_email, coc_password))
-
-@st.cache_data(ttl="12h")
+    return loop_manager.run_coroutine(_get_cwl_current_war_details_async(clan_tag, coc_email, coc_password))
 def get_cwl_group_clans(clan_tag, coc_email, coc_password):
-    return asyncio.run(_get_cwl_group_clans_async(clan_tag, coc_email, coc_password))
-
-@st.cache_data(ttl="6h")
+    return loop_manager.run_coroutine(_get_cwl_group_clans_async(clan_tag, coc_email, coc_password))
 def get_cwl_schedule(clan_tag, coc_email, coc_password):
-    return asyncio.run(_get_cwl_schedule_async(clan_tag, coc_email, coc_password))
-
-@st.cache_data(ttl="5m")
+    return loop_manager.run_coroutine(_get_cwl_schedule_async(clan_tag, coc_email, coc_password))
 def get_scouting_report(our_clan_tag, coc_email, coc_password):
-    return asyncio.run(_get_scouting_report_async(our_clan_tag, coc_email, coc_password))
+    return loop_manager.run_coroutine(_get_scouting_report_async(our_clan_tag, coc_email, coc_password))
 
-
-# --- LÓGICA ASSÍNCRONA (CORE) ---
-# As funções com "_" na frente contêm a lógica real que conversa com a API.
-
+# async logic
 async def _get_clan_data_async(clan_tag, coc_email, coc_password):
     client = coc.Client()
     try:
@@ -127,10 +107,11 @@ async def _get_cwl_data_async(clan_tag, coc_email, coc_password):
     finally:
         await client.close()
 
-async def _get_cwl_current_war_details_async(clan_tag, coc_email, coc_password):
-    client = coc.Client()
+async def _get_cwl_current_war_details_async(clan_tag, coc_email, coc_password, existing_client=None):
+    client = existing_client or coc.Client()
     try:
-        await client.login(coc_email, coc_password)
+        if not existing_client:
+            await client.login(coc_email, coc_password)
         group = await client.get_league_group(clan_tag)
         async for war in group.get_wars_for_clan(clan_tag):
             if war.state in ['preparation', 'inWar']:
@@ -144,16 +125,19 @@ async def _get_cwl_current_war_details_async(clan_tag, coc_email, coc_password):
                 return war_summary, df_clan, df_opponent, clan_side.tag, opponent_side.tag
         return None, None, None, None, None
     finally:
-        await client.close()
+        if not existing_client:
+            await client.close()
 
-async def _get_cwl_group_clans_async(clan_tag, coc_email, coc_password):
-    client = coc.Client()
+async def _get_cwl_group_clans_async(clan_tag, coc_email, coc_password, existing_client=None):
+    client = existing_client or coc.Client()
     try:
-        await client.login(coc_email, coc_password)
+        if not existing_client:
+            await client.login(coc_email, coc_password)
         group = await client.get_league_group(clan_tag)
         return group.clans
     finally:
-        await client.close()
+        if not existing_client:
+            await client.close()
 
 async def _get_cwl_schedule_async(clan_tag, coc_email, coc_password):
     client = coc.Client()
@@ -179,7 +163,7 @@ async def _get_scouting_report_async(our_clan_tag, coc_email, coc_password):
     client = coc.Client()
     try:
         await client.login(coc_email, coc_password)
-        df_schedule, _ = await _get_cwl_schedule_async(our_clan_tag, coc_email, coc_password, existing_client=client)
+        df_schedule, _ = await _get_cwl_schedule_async(our_clan_tag, coc_email, coc_password) # client is created inside
         if df_schedule is None or df_schedule.empty:
             return None, None, "Não foi possível carregar o cronograma."
         
