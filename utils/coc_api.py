@@ -114,17 +114,10 @@ def get_cwl_current_war_details(clan_tag, coc_email, coc_password):
         client = coc.Client()
         try:
             await client.login(coc_email, coc_password)
-            try:
-                group = await client.get_league_group(clan_tag)
-            except coc.NotFound:
-                return None, None, None, None, None
-
-            # --- LÓGICA CORRIGIDA ---
-            # 1. Usamos o get_wars_for_clan() que sabemos que funciona
+            group = await client.get_league_group(clan_tag)
+            
             async for war in group.get_wars_for_clan(clan_tag):
-                # 2. Verificamos o estado da guerra manualmente
-                if war.state == 'preparation' or war.state == 'inWar':
-                    # Achamos a guerra do dia! Processa e retorna os dados.
+                if war.state in ['preparation', 'inWar']:
                     clan_side = war.clan if war.clan.tag == clan_tag else war.opponent
                     opponent_side = war.opponent if war.clan.tag == clan_tag else war.clan
 
@@ -134,7 +127,10 @@ def get_cwl_current_war_details(clan_tag, coc_email, coc_password):
                     opponent_members_data = [{'Pos.': m.map_position, 'Nome': m.name, 'CV': m.town_hall} for m in opponent_side.members]
                     df_opponent = pd.DataFrame(opponent_members_data).sort_values(by='Pos.')
 
+                    # --- CORREÇÃO AQUI ---
+                    # Adicionamos 'clan_name' de volta ao dicionário de resumo
                     war_summary = {
+                        "clan_name": clan_side.name,
                         "opponent_name": opponent_side.name,
                         "state": war.state,
                         "start_time": war.start_time,
@@ -142,10 +138,11 @@ def get_cwl_current_war_details(clan_tag, coc_email, coc_password):
                     }
                     return war_summary, df_clan, df_opponent, clan_side.tag, opponent_side.tag
             
-            # 3. Se o loop terminar e não acharmos nenhuma guerra em preparação/andamento
             return None, None, None, None, None
         finally:
             await client.close()
+            
+    return asyncio.run(_fetch_cwl_war())
             
     return asyncio.run(_fetch_cwl_war())
 @st.cache_data(ttl="5m")
@@ -222,5 +219,6 @@ def get_cwl_group_clans(clan_tag, coc_email, coc_password):
             await client.close()
             
     return asyncio.run(_fetch_group_clans())
+
 
 
