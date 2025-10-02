@@ -71,10 +71,12 @@ async def _get_cwl_data_async(clan_tag, coc_email, coc_password):
     # Cole aqui a lógica completa da sua função _get_cwl_data_async
     pass
 
-async def _get_cwl_current_war_details_async(clan_tag, coc_email, coc_password):
-    client = coc.Client()
+async def _get_cwl_current_war_details_async(clan_tag, coc_email, coc_password, existing_client=None):
+    client = existing_client or coc.Client()
     try:
-        await client.login(coc_email, coc_password)
+        if not existing_client:
+            await client.login(coc_email, coc_password)
+        
         group = await client.get_league_group(clan_tag)
         async for war in group.get_wars_for_clan(clan_tag):
             if war.state in ['preparation', 'inWar']:
@@ -88,7 +90,8 @@ async def _get_cwl_current_war_details_async(clan_tag, coc_email, coc_password):
                 return war_summary, df_clan, df_opponent, clan_side.tag, opponent_side.tag
         return None, None, None, None, None
     finally:
-        await client.close()
+        if not existing_client:
+            await client.close()
 
 async def _get_cwl_group_clans_async(clan_tag, coc_email, coc_password):
     client = coc.Client()
@@ -142,4 +145,5 @@ async def _generate_full_league_preview_async(our_clan_tag, coc_email, coc_passw
         })
         
     return df_our_clan, league_preview
+
 
