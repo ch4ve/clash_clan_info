@@ -1,11 +1,12 @@
-# Conteúdo NOVO e REFATORADO de pages/2_⚔️_Guerra_Atual.py
+# CONTEÚDO PARA RESTAURAR A VERSÃO ANTIGA E ESTÁVEL
 
 import streamlit as st
-# Importamos nossos novos módulos de serviço!
-from services import api_client, database
+from utils.coc_api import get_current_war_data
+from utils.database import init_db, save_war_data, is_war_saved
+from datetime import datetime, timezone
 
-# A função de inicialização do banco agora é chamada a partir do módulo
-database.init_db()
+# A função de inicialização do banco é chamada aqui
+init_db()
 
 st.set_page_config(page_title="Guerra Atual", page_icon="⚔️", layout="wide")
 st.title("⚔️ Análise da Guerra Atual")
@@ -13,10 +14,12 @@ st.title("⚔️ Análise da Guerra Atual")
 if 'clan_tag' in st.session_state and st.session_state['clan_tag']:
     try:
         clan_tag = st.session_state['clan_tag']
+        coc_email = st.secrets["coc_email"]
+        coc_password = st.secrets["coc_password"]
 
         with st.spinner("Buscando dados da guerra atual..."):
-            # Usamos a função do nosso novo api_client
-            df_full_data, df_display_data, war_summary, war_state, war_end_time = api_client.get_current_war_data(clan_tag)
+            # A chamada à função da pasta utils
+            df_full_data, df_display_data, war_summary, war_state, war_end_time = get_current_war_data(clan_tag, coc_email, coc_password)
             
             if war_state is None:
                 st.info(f"O clã ({clan_tag}) não está em uma guerra no momento.")
@@ -35,13 +38,12 @@ if 'clan_tag' in st.session_state and st.session_state['clan_tag']:
                 
                 st.divider()
 
+                # Lógica de salvamento automático
                 if war_state == 'warEnded':
                     war_id = war_end_time.time.isoformat()
-                    # A função de verificação agora vem do módulo de database
-                    if not database.is_war_saved(war_id):
+                    if not is_war_saved(war_id):
                         st.info("Detectamos que a guerra terminou! Salvando resultado no histórico...")
-                        # A função de salvar agora vem do módulo de database
-                        database.save_war_data(war_summary, df_full_data, war_id)
+                        save_war_data(war_summary, df_full_data, war_id)
                         st.success("Resultado da guerra salvo automaticamente no histórico! ✨")
                         st.balloons()
                     else:
