@@ -1,26 +1,45 @@
+# --- CONTEÚDO FINAL E COMPLETO PARA utils/coc_api.py ---
+
+import streamlit as st
 import pandas as pd
 import coc
 import asyncio
 from collections import defaultdict
-from .loop_manager import loop_manager
 
 # --- FUNÇÕES SÍNCRONAS (WRAPPERS) ---
+# O Streamlit chama estas funções. Elas usam asyncio.run() para executar a lógica assíncrona.
+
+@st.cache_data(ttl="10m")
 def get_clan_data(clan_tag, coc_email, coc_password):
-    return loop_manager.run_coroutine(_get_clan_data_async(clan_tag, coc_email, coc_password))
+    return asyncio.run(_get_clan_data_async(clan_tag, coc_email, coc_password))
+
+@st.cache_data(ttl="5m")
 def get_current_war_data(clan_tag, coc_email, coc_password):
-    return loop_manager.run_coroutine(_get_current_war_data_async(clan_tag, coc_email, coc_password))
+    return asyncio.run(_get_current_war_data_async(clan_tag, coc_email, coc_password))
+
+@st.cache_data(ttl="2h")
 def get_cwl_data(clan_tag, coc_email, coc_password):
-    return loop_manager.run_coroutine(_get_cwl_data_async(clan_tag, coc_email, coc_password))
+    return asyncio.run(_get_cwl_data_async(clan_tag, coc_email, coc_password))
+
+@st.cache_data(ttl="5m")
 def get_cwl_current_war_details(clan_tag, coc_email, coc_password):
-    return loop_manager.run_coroutine(_get_cwl_current_war_details_async(clan_tag, coc_email, coc_password))
+    return asyncio.run(_get_cwl_current_war_details_async(clan_tag, coc_email, coc_password))
+
+@st.cache_data(ttl="12h")
 def get_cwl_group_clans(clan_tag, coc_email, coc_password):
-    return loop_manager.run_coroutine(_get_cwl_group_clans_async(clan_tag, coc_email, coc_password))
+    return asyncio.run(_get_cwl_group_clans_async(clan_tag, coc_email, coc_password))
+
+@st.cache_data(ttl="6h")
 def get_cwl_schedule(clan_tag, coc_email, coc_password):
-    return loop_manager.run_coroutine(_get_cwl_schedule_async(clan_tag, coc_email, coc_password))
+    return asyncio.run(_get_cwl_schedule_async(clan_tag, coc_email, coc_password))
+
+@st.cache_data(ttl="5m")
 def generate_full_league_preview(our_clan_tag, coc_email, coc_password):
-    return loop_manager.run_coroutine(_generate_full_league_preview_async(our_clan_tag, coc_email, coc_password))
+    return asyncio.run(_generate_full_league_preview_async(our_clan_tag, coc_email, coc_password))
 
 # --- LÓGICA ASSÍNCRONA (CORE) ---
+# As funções com "_" na frente contêm a lógica real que conversa com a API.
+
 async def _get_clan_data_async(clan_tag, coc_email, coc_password):
     client = coc.Client()
     try:
@@ -72,16 +91,38 @@ async def _get_current_war_data_async(clan_tag, coc_email, coc_password):
     except coc.NotFound:
         return None, None, None, None, None
     finally:
-        await client.close()
+        if 'client' in locals() and client.http.session and not client.http.session.closed:
+            await client.close()
 
-async def _get_cwl_group_clans_async(clan_tag, coc_email, coc_password, existing_client=None):
-    client = existing_client or coc.Client()
+async def _get_cwl_data_async(clan_tag, coc_email, coc_password):
+    client = coc.Client()
     try:
-        if not existing_client: await client.login(coc_email, coc_password)
+        await client.login(coc_email, coc_password)
         group = await client.get_league_group(clan_tag)
-        return group.clans
+        all_attacks_data = []
+        war_day = 0
+        async for war in group.get_wars_for_clan(clan_tag):
+            war_day += 1
+            clan_side = war.clan if war.clan.tag == clan_tag else war.opponent
+            for member in clan_side.members:
+                if member.attacks:
+                    attack = member.attacks[0]
+                    all_attacks_data.append({'Tag do Jogador': member.tag, 'Nome': member.name, 'Dia da Guerra': war_day, 'Estrelas': attack.stars})
+        if not all_attacks_data:
+            return pd.DataFrame(), group.season
+        df_attacks = pd.DataFrame(all_attacks_data)
+        summary = df_attacks.groupby(['Tag do Jogador', 'Nome']).agg(Total_Estrelas=('Estrelas', 'sum'), Ataques_Feitos=('Estrelas', 'size')).reset_index()
+        summary['Media_Estrelas'] = (summary['Total_Estrelas'] / summary['Ataques_Feitos']).round(2)
+        total_guerras = df_attacks['Dia da Guerra'].nunique()
+        summary['Guerras_Ausente'] = total_guerras - summary['Ataques_Feitos']
+        summary = summary.sort_values(by='Total_Estrelas', ascending=False)
+        summary.rename(columns={'Nome': 'Nome do Jogador', 'Total_Estrelas': 'Total de Estrelas', 'Ataques_Feitos': 'Ataques Feitos', 'Media_Estrelas': 'Média de Estrelas', 'Guerras_Ausente': 'Guerras Ausente'}, inplace=True)
+        return summary, group.season
+    except coc.NotFound:
+        return None, None
     finally:
-        if not existing_client: await client.close()
+        if 'client' in locals() and client.http.session and not client.http.session.closed:
+            await client.close()
 
 async def _get_cwl_current_war_details_async(clan_tag, coc_email, coc_password, existing_client=None):
     client = existing_client or coc.Client()
@@ -100,39 +141,53 @@ async def _get_cwl_current_war_details_async(clan_tag, coc_email, coc_password, 
                 return war_summary, df_clan, df_opponent, clan_side.tag, opponent_side.tag
         return None, None, None, None, None
     finally:
-        if not existing_client: await client.close()
+        if not existing_client and 'client' in locals() and client.http.session and not client.http.session.closed:
+            await client.close()
+
+async def _get_cwl_group_clans_async(clan_tag, coc_email, coc_password, existing_client=None):
+    client = existing_client or coc.Client()
+    try:
+        if not existing_client: await client.login(coc_email, coc_password)
+        group = await client.get_league_group(clan_tag)
+        return group.clans
+    finally:
+        if not existing_client and 'client' in locals() and client.http.session and not client.http.session.closed:
+            await client.close()
+
+async def _get_cwl_schedule_async(clan_tag, coc_email, coc_password):
+    client = coc.Client()
+    try:
+        await client.login(coc_email, coc_password)
+        group = await client.get_league_group(clan_tag)
+        clan_map = {c.tag: c.name for c in group.clans}
+        schedule = []
+        for war_day, round_tags_list in enumerate(group.rounds, 1):
+            our_war_tag = next((tag for tag in round_tags_list if clan_tag in tag), None)
+            if our_war_tag:
+                tags = our_war_tag.replace("#", "").split("v")
+                opponent_tag = f"#{tags[1]}" if tags[0] == clan_tag.replace("#","") else f"#{tags[0]}"
+                schedule.append({'Dia': war_day, 'Oponente': clan_map.get(opponent_tag, "Desconhecido"), 'Tag do Oponente': opponent_tag})
+        return pd.DataFrame(schedule), group.season
+    except coc.NotFound:
+        return None, None
+    finally:
+        if 'client' in locals() and client.http.session and not client.http.session.closed:
+            await client.close()
 
 async def _generate_full_league_preview_async(our_clan_tag, coc_email, coc_password):
     client = coc.Client()
     try:
         await client.login(coc_email, coc_password)
-
-        # Helper interno para reutilizar lógica
-        async def _internal_get_war_details(tag):
-            group = await client.get_league_group(tag)
-            async for war in group.get_wars_for_clan(tag):
-                if war.state in ['preparation', 'inWar']:
-                    clan_side = war.clan if war.clan.tag == tag else war.opponent
-                    opponent_side = war.opponent if war.clan.tag == tag else war.clan
-                    clan_members_data = [{'Pos.': m.map_position, 'Nome': m.name, 'CV': m.town_hall} for m in clan_side.members]
-                    df_clan = pd.DataFrame(clan_members_data).sort_values(by='Pos.')
-                    opponent_members_data = [{'Pos.': m.map_position, 'Nome': m.name, 'CV': m.town_hall} for m in opponent_side.members]
-                    df_opponent = pd.DataFrame(opponent_members_data).sort_values(by='Pos.')
-                    war_summary = {"clan_name": clan_side.name, "opponent_name": opponent_side.name}
-                    return war_summary, df_clan, df_opponent, clan_side.tag, opponent_side.tag
-            return None, None, None, None, None
-
-        _, df_our_clan, _, _, _ = await _internal_get_war_details(our_clan_tag)
-        if df_our_clan is None:
-            return None, "Não foi possível carregar nossa guerra atual."
-
+        our_war_summary, df_our_clan, _, _, _ = await _get_cwl_current_war_details_async(our_clan_tag, coc_email, coc_password, existing_client=client)
+        if our_war_summary is None:
+            return None, None, "Não foi possível carregar nossa guerra atual."
+        
         all_clans = await _get_cwl_group_clans_async(our_clan_tag, coc_email, coc_password, existing_client=client)
         if not all_clans:
-            return None, "Não foi possível carregar a lista de clãs do grupo."
+            return None, None, "Não foi possível carregar a lista de clãs do grupo."
             
         opponents = [clan for clan in all_clans if clan.tag != our_clan_tag]
-        
-        tasks = [_internal_get_war_details(opponent.tag) for opponent in opponents]
+        tasks = [_get_cwl_current_war_details_async(opponent.tag, coc_email, coc_password, existing_client=client) for opponent in opponents]
         scouting_results = await asyncio.gather(*tasks, return_exceptions=True)
         
         league_preview = []
@@ -145,63 +200,7 @@ async def _generate_full_league_preview_async(our_clan_tag, coc_email, coc_passw
                 df_predicted_opponent = their_clan_df if their_clan_tag == opponents[i].tag else their_opponent_df
             league_preview.append({'opponent_name': opponent_name, 'predicted_lineup': df_predicted_opponent})
             
-        # Retorna apenas os 2 valores que a página espera
-        return df_our_clan, league_preview
+        return df_our_clan, league_preview, our_war_summary.get('clan_name', 'Nosso Clã')
     finally:
-        await client.close()
-
-async def _get_cwl_data_async(clan_tag, coc_email, coc_password):
-    client = coc.Client()
-    try:
-        await client.login(coc_email, coc_password)
-        try:
-            group = await client.get_league_group(clan_tag)
-        except coc.NotFound:
-            return None, None
-        
-        all_attacks_data = []
-        war_day = 0
-        async for war in group.get_wars_for_clan(clan_tag):
-            war_day += 1
-            clan_side = war.clan if war.clan.tag == clan_tag else war.opponent
-            for member in clan_side.members:
-                if member.attacks:
-                    attack = member.attacks[0]
-                    all_attacks_data.append({'Tag do Jogador': member.tag, 'Nome': member.name, 'Dia da Guerra': war_day, 'Estrelas': attack.stars})
-        
-        if not all_attacks_data:
-            return pd.DataFrame(), group.season
-            
-        df_attacks = pd.DataFrame(all_attacks_data)
-        summary = df_attacks.groupby(['Tag do Jogador', 'Nome']).agg(Total_Estrelas=('Estrelas', 'sum'), Ataques_Feitos=('Estrelas', 'size')).reset_index()
-        summary['Media_Estrelas'] = (summary['Total_Estrelas'] / summary['Ataques_Feitos']).round(2)
-        total_guerras_registradas = df_attacks['Dia da Guerra'].nunique()
-        summary['Guerras_Ausente'] = total_guerras_registradas - summary['Ataques_Feitos']
-        summary = summary.sort_values(by='Total_Estrelas', ascending=False)
-        summary.rename(columns={'Nome': 'Nome do Jogador', 'Total_Estrelas': 'Total de Estrelas', 'Ataques_Feitos': 'Ataques Feitos', 'Media_Estrelas': 'Média de Estrelas', 'Guerras_Ausente': 'Guerras Ausente'}, inplace=True)
-        return summary, group.season
-    finally:
-        await client.close()
-
-async def _get_cwl_schedule_async(clan_tag, coc_email, coc_password):
-    client = coc.Client()
-    try:
-        await client.login(coc_email, coc_password)
-        try:
-            group = await client.get_league_group(clan_tag)
-        except coc.NotFound:
-            return None, None
-        
-        clan_map = {c.tag: c.name for c in group.clans}
-        schedule = []
-        for war_day, round_tags_list in enumerate(group.rounds, 1):
-            our_war_tag = next((tag for tag in round_tags_list if clan_tag in tag), None)
-            if our_war_tag:
-                tags = our_war_tag.replace("#", "").split("v")
-                opponent_tag = f"#{tags[1]}" if tags[0] == clan_tag.replace("#","") else f"#{tags[0]}"
-                schedule.append({'Dia': war_day, 'Oponente': clan_map.get(opponent_tag, "Desconhecido"), 'Tag do Oponente': opponent_tag})
-        
-        # Retornamos o DataFrame do cronograma e a temporada (ex: '2025-10')
-        return pd.DataFrame(schedule), group.season
-    finally:
-        await client.close()
+        if 'client' in locals() and client.http.session and not client.http.session.closed:
+            await client.close()
