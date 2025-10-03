@@ -1,11 +1,11 @@
-# Conteúdo NOVO e AUTOMÁTICO de pages/2_⚔️_Guerra_Atual.py
+# Conteúdo NOVO e REFATORADO de pages/2_⚔️_Guerra_Atual.py
 
 import streamlit as st
-from utils.coc_api import get_current_war_data
-# Importamos a nova função de verificação
-from utils.database import init_db, save_war_data, is_war_saved
+# Importamos nossos novos módulos de serviço!
+from services import api_client, database
 
-init_db()
+# A função de inicialização do banco agora é chamada a partir do módulo
+database.init_db()
 
 st.set_page_config(page_title="Guerra Atual", page_icon="⚔️", layout="wide")
 st.title("⚔️ Análise da Guerra Atual")
@@ -13,11 +13,10 @@ st.title("⚔️ Análise da Guerra Atual")
 if 'clan_tag' in st.session_state and st.session_state['clan_tag']:
     try:
         clan_tag = st.session_state['clan_tag']
-        coc_email = st.secrets["coc_email"]
-        coc_password = st.secrets["coc_password"]
 
         with st.spinner("Buscando dados da guerra atual..."):
-            df_full_data, df_display_data, war_summary, war_state, war_end_time = get_current_war_data(clan_tag, coc_email, coc_password)
+            # Usamos a função do nosso novo api_client
+            df_full_data, df_display_data, war_summary, war_state, war_end_time = api_client.get_current_war_data(clan_tag)
             
             if war_state is None:
                 st.info(f"O clã ({clan_tag}) não está em uma guerra no momento.")
@@ -27,7 +26,6 @@ if 'clan_tag' in st.session_state and st.session_state['clan_tag']:
                 st.subheader(f"Data da Guerra (Término): {data_guerra_formatada}")
                 st.write(f"**Estado da Guerra:** {war_state}")
 
-                # (O código do placar continua o mesmo...)
                 col1, col2, col3 = st.columns(3)
                 col1.metric(f"⭐ Placar {war_summary['clan_name']}", f"{war_summary['clan_stars']}", f"{war_summary['clan_destruction']:.2f}% de Destruição")
                 col2.metric(f"⭐ Placar {war_summary['opponent_name']}", f"{war_summary['opponent_stars']}", f"{war_summary['opponent_destruction']:.2f}% de Destruição", delta_color="inverse")
@@ -35,16 +33,15 @@ if 'clan_tag' in st.session_state and st.session_state['clan_tag']:
                 st.header("Tabela de Ataques")
                 st.dataframe(df_display_data, hide_index=True)
                 
-                st.divider() # Linha divisória para separar
+                st.divider()
 
-                # --- LÓGICA DE SALVAMENTO AUTOMÁTICO ---
-                # 1. Verifica se a guerra terminou
                 if war_state == 'warEnded':
                     war_id = war_end_time.time.isoformat()
-                    # 2. Verifica se a guerra já NÃO foi salva
-                    if not is_war_saved(war_id):
+                    # A função de verificação agora vem do módulo de database
+                    if not database.is_war_saved(war_id):
                         st.info("Detectamos que a guerra terminou! Salvando resultado no histórico...")
-                        save_war_data(war_summary, df_full_data, war_id)
+                        # A função de salvar agora vem do módulo de database
+                        database.save_war_data(war_summary, df_full_data, war_id)
                         st.success("Resultado da guerra salvo automaticamente no histórico! ✨")
                         st.balloons()
                     else:
@@ -55,5 +52,4 @@ if 'clan_tag' in st.session_state and st.session_state['clan_tag']:
 
 else:
     st.warning("⬅️ Por favor, insira uma tag de clã na página principal para começar.")
-    st.page_link("login.py", label="Ir para a página principal", icon="🏠")
-
+    st.page_link("app.py", label="Ir para a página principal", icon="🏠")
