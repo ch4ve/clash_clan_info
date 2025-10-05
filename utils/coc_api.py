@@ -125,11 +125,12 @@ async def _generate_full_league_preview_async(our_clan_tag, coc_email, coc_passw
                 df_predicted_opponent = their_clan_df # Assumindo que o primeiro DataFrame é o do clã buscado
             league_preview.append({'opponent_name': opponent_name, 'predicted_lineup': df_predicted_opponent})
             
-        return df_our_clan, league_preview, our_war_summary.get('clan_name', 'Nosso Clã')
+        return df_our_clan, league_preview
     finally:
         if 'client' in locals():
             await client.close()
 
 # As outras funções que não estão sendo usadas ativamente (histórico, resumo cwl) foram omitidas para focar na estabilidade.
+
 
 
