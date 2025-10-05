@@ -208,5 +208,6 @@ async def _generate_full_league_preview_async(our_clan_tag, coc_email, coc_passw
             
         return df_our_clan, league_preview, our_war_summary.get('clan_name', 'Nosso Clã')
     finally:
-        if 'client' in locals():
-            await client.close()
+        if 'client' in locals() and not client.is_closed(): await client.close()
+
+
