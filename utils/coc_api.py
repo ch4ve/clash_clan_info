@@ -96,8 +96,8 @@ async def _get_current_war_data_async(clan_tag, coc_email, coc_password):
     except coc.NotFound:
         return None, None, None, None, None
     finally:
-        if 'client' in locals() and not client.is_closed():
-            await client.close()
+    if 'client' in locals():
+        await client.close()
 
 async def _get_cwl_data_async(clan_tag, coc_email, coc_password):
     client = coc.Client()
@@ -126,8 +126,8 @@ async def _get_cwl_data_async(clan_tag, coc_email, coc_password):
     except coc.NotFound:
         return None, None
     finally:
-        if 'client' in locals() and not client.is_closed():
-            await client.close()
+    if 'client' in locals():
+        await client.close()
 
 async def _get_cwl_current_war_details_async(clan_tag, coc_email, coc_password, existing_client=None):
     client = existing_client or coc.Client()
@@ -146,8 +146,8 @@ async def _get_cwl_current_war_details_async(clan_tag, coc_email, coc_password, 
                 return war_summary, df_clan, df_opponent, clan_side.tag, opponent_side.tag
         return None, None, None, None, None
     finally:
-        if not existing_client and 'client' in locals() and not client.is_closed():
-            await client.close()
+    if 'client' in locals():
+        await client.close()
 
 async def _get_cwl_group_clans_async(clan_tag, coc_email, coc_password, existing_client=None):
     client = existing_client or coc.Client()
@@ -156,8 +156,8 @@ async def _get_cwl_group_clans_async(clan_tag, coc_email, coc_password, existing
         group = await client.get_league_group(clan_tag)
         return group.clans
     finally:
-        if not existing_client and 'client' in locals() and not client.is_closed():
-            await client.close()
+    if 'client' in locals():
+        await client.close()
 
 async def _get_cwl_schedule_async(clan_tag, coc_email, coc_password):
     client = coc.Client()
@@ -176,8 +176,8 @@ async def _get_cwl_schedule_async(clan_tag, coc_email, coc_password):
     except coc.NotFound:
         return None, None
     finally:
-        if 'client' in locals() and not client.is_closed():
-            await client.close()
+    if 'client' in locals():
+        await client.close()
             
 async def _generate_full_league_preview_async(our_clan_tag, coc_email, coc_password):
     client = coc.Client()
@@ -209,5 +209,6 @@ async def _generate_full_league_preview_async(our_clan_tag, coc_email, coc_passw
             
         return df_our_clan, league_preview
     finally:
-        if 'client' in locals() and not client.is_closed():
-            await client.close()
+    if 'client' in locals():
+        await client.close()
+
