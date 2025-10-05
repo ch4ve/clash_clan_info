@@ -1,4 +1,4 @@
-# --- CONTEÚDO FINAL E COMPLETO PARA utils/coc_api.py ---
+# --- CONTEÚDO FINAL, COMPLETO E PADRONIZADO PARA utils/coc_api.py ---
 
 import streamlit as st
 import pandas as pd
@@ -7,7 +7,7 @@ import asyncio
 from collections import defaultdict
 
 # --- FUNÇÕES SÍNCRONAS (WRAPPERS) ---
-# O Streamlit chama estas funções. Elas usam asyncio.run() para executar a lógica assíncrona.
+# Nenhuma mudança aqui, esta parte está correta.
 
 @st.cache_data(ttl="10m")
 def get_clan_data(clan_tag, coc_email, coc_password):
@@ -39,7 +39,7 @@ def generate_full_league_preview(our_clan_tag, coc_email, coc_password):
 
 
 # --- LÓGICA ASSÍNCRONA (CORE) ---
-# As funções com "_" na frente contêm a lógica real que conversa com a API.
+# As correções foram aplicadas nos blocos 'finally'
 
 async def _get_clan_data_async(clan_tag, coc_email, coc_password):
     client = coc.Client()
@@ -54,7 +54,8 @@ async def _get_clan_data_async(clan_tag, coc_email, coc_password):
         members_data = await asyncio.gather(*tasks)
         return pd.DataFrame(members_data), clan.name
     finally:
-        if 'client' in locals() and not client.is_closed():
+        # CORREÇÃO: Forma simples e compatível de fechar
+        if 'client' in locals():
             await client.close()
 
 async def _get_current_war_data_async(clan_tag, coc_email, coc_password):
@@ -69,13 +70,11 @@ async def _get_current_war_data_async(clan_tag, coc_email, coc_password):
             estrelas_atk1, cv_inimigo_atk1, destruicao_atk1, duracao_atk1 = 0, "-", 0, 0
             estrelas_atk2, cv_inimigo_atk2, destruicao_atk2, duracao_atk2 = 0, "-", 0, 0
             if ataques_feitos >= 1:
-                atk1 = member.attacks[0]
-                estrelas_atk1, destruicao_atk1, duracao_atk1 = atk1.stars, atk1.destruction, atk1.duration
+                atk1 = member.attacks[0]; estrelas_atk1, destruicao_atk1, duracao_atk1 = atk1.stars, atk1.destruction, atk1.duration
                 inimigo1 = opponent_map.get(atk1.defender_tag)
                 if inimigo1: cv_inimigo_atk1 = inimigo1.town_hall
             if ataques_feitos == 2:
-                atk2 = member.attacks[1]
-                estrelas_atk2, destruicao_atk2, duracao_atk2 = atk2.stars, atk2.destruction, atk2.duration
+                atk2 = member.attacks[1]; estrelas_atk2, destruicao_atk2, duracao_atk2 = atk2.stars, atk2.destruction, atk2.duration
                 inimigo2 = opponent_map.get(atk2.defender_tag)
                 if inimigo2: cv_inimigo_atk2 = inimigo2.town_hall
             attacks_data.append({'Posição': member.map_position, 'Nome': member.name, 'Ataques Feitos': ataques_feitos, 'Estrelas Atk 1': estrelas_atk1, 'CV Inimigo Atk 1': cv_inimigo_atk1, 'Estrelas Atk 2': estrelas_atk2, 'CV Inimigo Atk 2': cv_inimigo_atk2, 'Destruição Atk 1': destruicao_atk1, 'Duração Atk 1 (s)': duracao_atk1, 'Destruição Atk 2': destruicao_atk2, 'Duração Atk 2 (s)': duracao_atk2})
@@ -96,8 +95,8 @@ async def _get_current_war_data_async(clan_tag, coc_email, coc_password):
     except coc.NotFound:
         return None, None, None, None, None
     finally:
-    if 'client' in locals():
-        await client.close()
+        if 'client' in locals():
+            await client.close()
 
 async def _get_cwl_data_async(clan_tag, coc_email, coc_password):
     client = coc.Client()
@@ -126,8 +125,19 @@ async def _get_cwl_data_async(clan_tag, coc_email, coc_password):
     except coc.NotFound:
         return None, None
     finally:
-    if 'client' in locals():
-        await client.close()
+        if 'client' in locals():
+            await client.close()
+
+async def _get_cwl_group_clans_async(clan_tag, coc_email, coc_password, existing_client=None):
+    client = existing_client or coc.Client()
+    try:
+        if not existing_client: await client.login(coc_email, coc_password)
+        group = await client.get_league_group(clan_tag)
+        return group.clans
+    finally:
+        # CORREÇÃO: Só fecha se não for um cliente existente
+        if not existing_client and 'client' in locals():
+            await client.close()
 
 async def _get_cwl_current_war_details_async(clan_tag, coc_email, coc_password, existing_client=None):
     client = existing_client or coc.Client()
@@ -146,18 +156,9 @@ async def _get_cwl_current_war_details_async(clan_tag, coc_email, coc_password, 
                 return war_summary, df_clan, df_opponent, clan_side.tag, opponent_side.tag
         return None, None, None, None, None
     finally:
-    if 'client' in locals():
-        await client.close()
-
-async def _get_cwl_group_clans_async(clan_tag, coc_email, coc_password, existing_client=None):
-    client = existing_client or coc.Client()
-    try:
-        if not existing_client: await client.login(coc_email, coc_password)
-        group = await client.get_league_group(clan_tag)
-        return group.clans
-    finally:
-    if 'client' in locals():
-        await client.close()
+        # CORREÇÃO: Só fecha se não for um cliente existente
+        if not existing_client and 'client' in locals():
+            await client.close()
 
 async def _get_cwl_schedule_async(clan_tag, coc_email, coc_password):
     client = coc.Client()
@@ -176,24 +177,22 @@ async def _get_cwl_schedule_async(clan_tag, coc_email, coc_password):
     except coc.NotFound:
         return None, None
     finally:
-    if 'client' in locals():
-        await client.close()
-            
+        if 'client' in locals():
+            await client.close()
+
 async def _generate_full_league_preview_async(our_clan_tag, coc_email, coc_password):
     client = coc.Client()
     try:
         await client.login(coc_email, coc_password)
-        
         our_war_summary, df_our_clan, _, _, _ = await _get_cwl_current_war_details_async(our_clan_tag, coc_email, coc_password, existing_client=client)
         if our_war_summary is None:
-            return None, None # Alterado para retornar 2 valores
+            return None, None, "Não foi possível carregar nossa guerra atual."
         
         all_clans = await _get_cwl_group_clans_async(our_clan_tag, coc_email, coc_password, existing_client=client)
         if not all_clans:
-            return None, None # Alterado para retornar 2 valores
+            return None, None, "Não foi possível carregar a lista de clãs do grupo."
             
         opponents = [clan for clan in all_clans if clan.tag != our_clan_tag]
-        
         tasks = [_get_cwl_current_war_details_async(opponent.tag, coc_email, coc_password, existing_client=client) for opponent in opponents]
         scouting_results = await asyncio.gather(*tasks, return_exceptions=True)
         
@@ -207,8 +206,7 @@ async def _generate_full_league_preview_async(our_clan_tag, coc_email, coc_passw
                 df_predicted_opponent = their_clan_df if their_clan_tag == opponents[i].tag else their_opponent_df
             league_preview.append({'opponent_name': opponent_name, 'predicted_lineup': df_predicted_opponent})
             
-        return df_our_clan, league_preview
+        return df_our_clan, league_preview, our_war_summary.get('clan_name', 'Nosso Clã')
     finally:
-    if 'client' in locals():
-        await client.close()
-
+        if 'client' in locals():
+            await client.close()
