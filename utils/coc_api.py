@@ -16,7 +16,9 @@ def get_cwl_group_clans(clan_tag, coc_email, coc_password):
     return loop_manager.run_coroutine(_get_cwl_group_clans_async(clan_tag, coc_email, coc_password))
 def generate_full_league_preview(our_clan_tag, coc_email, coc_password):
     return loop_manager.run_coroutine(_generate_full_league_preview_async(our_clan_tag, coc_email, coc_password))
-
+@st.cache_data(ttl="5m")
+def get_current_war_data(clan_tag, coc_email, coc_password):
+    return loop_manager.run_coroutine(_get_current_war_data_async(clan_tag, coc_email, coc_password))
 # --- LÓGICA ASSÍNCRONA (CORE) ---
 async def _get_clan_data_async(clan_tag, coc_email, coc_password):
     client = coc.Client()
@@ -121,3 +123,4 @@ async def _generate_full_league_preview_async(our_clan_tag, coc_email, coc_passw
         return df_our_clan, league_preview
     finally:
         await client.close()
+
