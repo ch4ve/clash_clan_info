@@ -64,7 +64,8 @@ async def _get_cwl_current_war_details_async(clan_tag, coc_email, coc_password, 
                 return war_summary, df_clan, df_opponent
         return None, None, None
     finally:
-        if not existing_client and 'client' in locals() and not client.is_closed(): await client.close()
+    if 'client' in locals():
+        await client.close()
 
 async def _generate_full_league_preview_async(our_clan_tag, coc_email, coc_password):
     client = coc.Client()
@@ -96,4 +97,6 @@ async def _generate_full_league_preview_async(our_clan_tag, coc_email, coc_passw
             
         return df_our_clan, league_preview, our_war_summary.get('clan_name', 'Nosso Clã')
     finally:
-        if 'client' in locals() and not client.is_closed(): await client.close()
+    if 'client' in locals():
+        await client.close()
+
