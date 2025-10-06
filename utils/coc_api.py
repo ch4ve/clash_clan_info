@@ -29,11 +29,12 @@ async def _get_clan_data_async(clan_tag, coc_email, coc_password):
             player = await client.get_player(member.tag)
             hero_levels = {h.name: h.level for h in player.heroes}
             return {
+                'Tag': player.tag, # <-- NOVA INFORMAÇÃO
                 'Nome': player.name,
                 'Cargo': player.role.name,
                 'CV': player.town_hall,
                 'Liga': player.league.name if player.league else 'Sem Liga',
-                'Ícone Liga': player.league.icon.url if player.league else None, # <-- NOVA INFORMAÇÃO
+                'Ícone Liga': player.league.icon.url if player.league else None,
                 'Troféus': player.trophies,
                 'Rei Bárbaro': hero_levels.get('Barbarian King', 0),
                 'Rainha Arqueira': hero_levels.get('Archer Queen', 0),
@@ -44,7 +45,6 @@ async def _get_clan_data_async(clan_tag, coc_email, coc_password):
         tasks = [fetch_player_data(member) for member in clan.members]
         members_data = await asyncio.gather(*tasks)
         
-        # Agora a função retorna 3 valores, incluindo a URL do emblema do clã
         return pd.DataFrame(members_data), clan.name, clan.badge.url
     finally:
         await client.close()
@@ -197,6 +197,7 @@ async def _get_current_war_data_async(clan_tag, coc_email, coc_password):
         return None, None, None, None, None
     finally:
         await client.close()
+
 
 
 
