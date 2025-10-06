@@ -10,7 +10,6 @@ certifi==2025.8.3
 cffi==2.0.0
 charset-normalizer==3.4.3
 click==8.3.0
-coc.py==3.9.1
 colorama==0.4.6
 cssselect2==0.8.0
 fonttools==4.60.0
@@ -44,7 +43,7 @@ requests==2.32.5
 rpds-py==0.27.1
 six==1.17.0
 smmap==5.0.2
-streamlit==1.49.1
+streamlit==1.50.0
 tenacity==9.1.2
 tinycss2==1.4.0
 tinyhtml5==2.0.0
