@@ -2,7 +2,7 @@
 
 import streamlit as st
 import pandas as pd
-from utils.api import get_clan_data
+from utils.coc-api import get_clan_data
 # Não precisamos mais importar a função de top 5 aqui por enquanto
 # from utils.database import get_top_war_performers
 
@@ -64,3 +64,4 @@ else:
             
     except Exception as e:
         st.error(f"Ocorreu um erro: {e}")
+
