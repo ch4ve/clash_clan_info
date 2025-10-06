@@ -141,7 +141,7 @@ async def _generate_full_league_preview_async(our_clan_tag, coc_email, coc_passw
         # A função agora retorna os 3 valores que a página espera
         return df_our_clan, league_preview, our_war_summary.get('clan_name', 'Nosso Clã')
     finally:
-        if 'client' in locals() and not client.is_closed():
+        if not existing_client:
             await client.close()
 
 async def _get_current_war_data_async(clan_tag, coc_email, coc_password):
@@ -185,6 +185,7 @@ async def _get_current_war_data_async(clan_tag, coc_email, coc_password):
     finally:
         if 'client' in locals():
             await client.close()
+
 
 
 
