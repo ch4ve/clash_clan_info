@@ -2,7 +2,7 @@
 
 import streamlit as st
 import pandas as pd
-from utils.api import get_clan_data
+from utils.coc_api import get_clan_data
 from utils.database import get_top_war_performers
 
 st.set_page_config(page_title="Info do Clã", page_icon="ℹ️", layout="wide")
@@ -65,3 +65,4 @@ else:
             
     except Exception as e:
         st.error(f"Ocorreu um erro: {e}")
+
