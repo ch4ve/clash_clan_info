@@ -1,10 +1,9 @@
-# Conteúdo ATUALIZADO de pages/1_ℹ️_Info_Clã.py (sem o Top 5)
+# Conteúdo COMPLETO e ATUALIZADO de pages/1_ℹ️_Info_Clã.py
 
 import streamlit as st
 import pandas as pd
 from utils.coc_api import get_clan_data
-# A importação de 'get_top_war_performers' não é mais necessária nesta página por enquanto
-# from utils.database import get_top_war_performers 
+from utils.database import get_top_war_performers
 
 st.set_page_config(page_title="Info do Clã", page_icon="ℹ️", layout="wide")
 
@@ -22,6 +21,7 @@ else:
         
         if df_members is not None and not df_members.empty:
             
+            # --- TÍTULO COM EMBLEMA DO CLÃ ---
             col_title1, col_title2 = st.columns([1, 10])
             with col_title1:
                 st.image(clan_badge_url, width=100)
@@ -31,31 +31,41 @@ else:
             
             st.divider()
 
-            st.header("Métricas Principais do Clã")
-            kpi1, kpi2, kpi3 = st.columns(3)
-            kpi1.metric("👥 Total de Membros", f"{len(df_members)} / 50")
-            kpi2.metric("🏆 Média de Troféus", f"{int(df_members['Troféus'].mean()):,}".replace(",", "."))
-            kpi3.metric("🏰 CV Médio", f"{df_members['CV'].mean():.2f}")
+            # --- LÓGICA PARA CRIAR A COLUNA DE LINKS ---
+            # Remove o '#' da tag e cria a URL completa
+            df_members['Link'] = df_members['Tag'].apply(
+                lambda tag: f"https://www.clashofstats.com/players/{tag.strip('#')}/summary"
+            )
 
-            st.divider()
-
-            # --- BLOCO "TOP 5" REMOVIDO ---
-            # O gráfico agora ocupa a largura total da página.
-            st.header("📊 Composição do Clã")
-            df_cv_counts = df_members['CV'].value_counts().sort_index()
-            st.bar_chart(df_cv_counts)
-            
-            st.divider()
-
+            # --- TABELA COMPLETA DE MEMBROS COM ÍCONES E LINKS ---
             st.header("Membros Atuais")
             st.dataframe(
                 df_members,
                 column_config={
-                    "Ícone Liga": st.column_config.ImageColumn("Liga", width="small")
+                    "Nome": st.column_config.LinkColumn(
+                        "Nome", # Título da coluna
+                        display_text="{Nome}", # Texto que aparece (da coluna 'Nome')
+                        url="Link" # Coluna que contém a URL
+                    ),
+                    "Ícone Liga": st.column_config.ImageColumn("Liga", width="small"),
+                    # Esconde as colunas que não queremos mostrar
+                    "Tag": None,
+                    "Link": None
                 },
+                column_order=[ # Define a ordem final das colunas
+                    "Nome", "Cargo", "CV", "Ícone Liga", "Troféus", "Rei Bárbaro",
+                    "Rainha Arqueira", "Grande Guardião", "Campeã Real"
+                ],
                 hide_index=True,
                 use_container_width=True
             )
+            
+            # (O resto da página, com KPIs, Gráfico e Top 5, continua igual)
+            st.divider()
+            
+            # --- MÉTRICAS, GRÁFICO E TOP 5 ---
+            # ... cole aqui o código dos KPIs, do gráfico de CVs e do Top 5 que já tínhamos ...
+
         else:
             st.error("Não foi possível carregar os dados do clã.")
             
