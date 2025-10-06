@@ -29,7 +29,7 @@ async def _get_clan_data_async(clan_tag, coc_email, coc_password):
             player = await client.get_player(member.tag)
             hero_levels = {h.name: h.level for h in player.heroes}
             return {
-                'Tag': player.tag, # <-- NOVA INFORMAÇÃO
+                'Tag': player.tag, # <-- INFORMAÇÃO DA TAG ADICIONADA
                 'Nome': player.name,
                 'Cargo': player.role.name,
                 'CV': player.town_hall,
@@ -197,6 +197,7 @@ async def _get_current_war_data_async(clan_tag, coc_email, coc_password):
         return None, None, None, None, None
     finally:
         await client.close()
+
 
 
 
