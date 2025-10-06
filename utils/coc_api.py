@@ -97,7 +97,23 @@ async def _generate_full_league_preview_async(our_clan_tag, coc_email, coc_passw
     client = coc.Client()
     try:
         await client.login(coc_email, coc_password)
-        our_war_summary, df_our_clan, _, _, _ = await _get_cwl_current_war_details_async(our_clan_tag, coc_email, coc_password, existing_client=client)
+        
+        # Helper interno para reutilizar lógica
+        async def _internal_get_war_details(tag, shared_client):
+            group = await shared_client.get_league_group(tag)
+            async for war in group.get_wars_for_clan(tag):
+                if war.state in ['preparation', 'inWar']:
+                    clan_side = war.clan if war.clan.tag == tag else war.opponent
+                    opponent_side = war.opponent if war.clan.tag == tag else war.clan
+                    clan_members_data = [{'Pos.': m.map_position, 'Nome': m.name, 'CV': m.town_hall} for m in clan_side.members]
+                    df_clan = pd.DataFrame(clan_members_data).sort_values(by='Pos.')
+                    opponent_members_data = [{'Pos.': m.map_position, 'Nome': m.name, 'CV': m.town_hall} for m in opponent_side.members]
+                    df_opponent = pd.DataFrame(opponent_members_data).sort_values(by='Pos.')
+                    war_summary = {"clan_name": clan_side.name, "opponent_name": opponent_side.name}
+                    return war_summary, df_clan, df_opponent, clan_side.tag
+            return None, None, None, None
+
+        our_war_summary, df_our_clan, _, _ = await _internal_get_war_details(our_clan_tag, client)
         if our_war_summary is None:
             return None, None, "Não foi possível carregar nossa guerra atual."
         
@@ -106,22 +122,27 @@ async def _generate_full_league_preview_async(our_clan_tag, coc_email, coc_passw
             return None, None, "Não foi possível carregar a lista de clãs do grupo."
             
         opponents = [clan for clan in all_clans if clan.tag != our_clan_tag]
-        tasks = [_get_cwl_current_war_details_async(opponent.tag, coc_email, coc_password, existing_client=client) for opponent in opponents]
+        
+        tasks = [_internal_get_war_details(opponent.tag, client) for opponent in opponents]
         scouting_results = await asyncio.gather(*tasks, return_exceptions=True)
         
         league_preview = []
         for i, result in enumerate(scouting_results):
             opponent_name = opponents[i].name
-            if isinstance(result, Exception) or result[0] is None:
+            if isinstance(result, Exception) or result is None:
                 df_predicted_opponent = pd.DataFrame([{"Erro": f"Não foi possível carregar a guerra de {opponent_name}."}])
             else:
-                _, their_clan_df, their_opponent_df, their_clan_tag, _ = result
+                _, their_clan_df, their_opponent_df, their_clan_tag = result
                 df_predicted_opponent = their_clan_df if their_clan_tag == opponents[i].tag else their_opponent_df
+            
             league_preview.append({'opponent_name': opponent_name, 'predicted_lineup': df_predicted_opponent})
             
-        return df_our_clan, league_preview
+        # --- A CORREÇÃO ESTÁ AQUI ---
+        # A função agora retorna os 3 valores que a página espera
+        return df_our_clan, league_preview, our_war_summary.get('clan_name', 'Nosso Clã')
     finally:
-        await client.close()
+        if 'client' in locals() and not client.is_closed():
+            await client.close()
 
 async def _get_current_war_data_async(clan_tag, coc_email, coc_password):
     client = coc.Client()
@@ -164,6 +185,7 @@ async def _get_current_war_data_async(clan_tag, coc_email, coc_password):
     finally:
         if 'client' in locals():
             await client.close()
+
 
 
 
