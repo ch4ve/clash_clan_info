@@ -1,8 +1,8 @@
-# Conteúdo COMPLETO e ATUALIZADO de pages/1_ℹ️_Info_Clã.py
+# Conteúdo ATUALIZADO e OTIMIZADO de pages/1_ℹ️_Info_Clã.py
 
 import streamlit as st
 import pandas as pd
-from utils.coc_api import get_clan_data
+from utils.api import get_clan_data
 from utils.database import get_top_war_performers
 
 st.set_page_config(page_title="Info do Clã", page_icon="ℹ️", layout="wide")
@@ -32,8 +32,7 @@ else:
             st.divider()
 
             # --- LÓGICA PARA CRIAR A COLUNA DE LINKS ---
-            # Remove o '#' da tag e cria a URL completa
-            df_members['Link'] = df_members['Tag'].apply(
+            df_members['Perfil'] = df_members['Tag'].apply(
                 lambda tag: f"https://www.clashofstats.com/players/{tag.strip('#')}/summary"
             )
 
@@ -42,29 +41,24 @@ else:
             st.dataframe(
                 df_members,
                 column_config={
-                    "Nome": st.column_config.LinkColumn(
-                        "Nome", # Título da coluna
-                        display_text="{Nome}", # Texto que aparece (da coluna 'Nome')
-                        url="Link" # Coluna que contém a URL
+                    "Ícone Liga": st.column_config.ImageColumn("Liga"),
+                    # --- CORREÇÃO APLICADA AQUI ---
+                    # Transforma a coluna 'Perfil' em uma coluna de links clicáveis
+                    "Perfil": st.column_config.LinkColumn(
+                        "Perfil Externo",
+                        display_text="Abrir ↗️"
                     ),
-                    "Ícone Liga": st.column_config.ImageColumn("Liga", width="small"),
-                    # Esconde as colunas que não queremos mostrar
-                    "Tag": None,
-                    "Link": None
+                    "Tag": None # Esconde a coluna da tag original
                 },
                 column_order=[ # Define a ordem final das colunas
-                    "Nome", "Cargo", "CV", "Ícone Liga", "Troféus", "Rei Bárbaro",
-                    "Rainha Arqueira", "Grande Guardião", "Campeã Real"
+                    "Nome", "Cargo", "CV", "Ícone Liga", "Troféus", "Perfil"
                 ],
                 hide_index=True,
                 use_container_width=True
             )
             
-            # (O resto da página, com KPIs, Gráfico e Top 5, continua igual)
-            st.divider()
-            
-            # --- MÉTRICAS, GRÁFICO E TOP 5 ---
-            # ... cole aqui o código dos KPIs, do gráfico de CVs e do Top 5 que já tínhamos ...
+            # (O resto da sua página, com KPIs, Gráfico e Top 5, continua aqui)
+            # ...
 
         else:
             st.error("Não foi possível carregar os dados do clã.")
