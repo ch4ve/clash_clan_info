@@ -79,25 +79,40 @@ def get_war_by_id(war_id):
     return None, None
 
 def get_top_war_performers(limit=5):
-    """Busca as últimas 'limit' guerras e calcula o ranking dos melhores."""
-    with get_db_connection() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT data_json FROM wars ORDER BY war_date DESC LIMIT %s", (limit,))
-            war_data = cursor.fetchall()
-            
-            if not war_data: return pd.DataFrame()
+    """
+    Busca as últimas guerras do histórico e calcula o ranking de performance.
+    Compatível com dados antigos que não possuem todas as colunas.
+    """
+    war_data_rows = get_last_n_wars(limit=limit)
+    if not war_data_rows:
+        return pd.DataFrame()
 
-            player_stats = defaultdict(lambda: {'Total Estrelas': 0, 'Total Destruição': 0, 'Total Duração': 0})
-            
-            for war_row in war_data:
-                df_war = pd.read_json(war_row[0], orient='split')
-                for _, player_row in df_war.iterrows():
-                    player_name = player_row['Nome']
-                    player_stats[player_name]['Total Estrelas'] += player_row['Estrelas Totais']
-                    player_stats[player_name]['Total Destruição'] += int(str(player_row['Destruição Total']).replace('%', ''))
-                    player_stats[player_name]['Duração Total (s)'] += player_row['Duração Total (s)']
-            
-            if not player_stats: return pd.DataFrame()
-            df_summary = pd.DataFrame.from_dict(player_stats, orient='index').reset_index().rename(columns={'index': 'Nome'})
-            df_summary = df_summary.sort_values(by=['Total Estrelas', 'Total Destruição', 'Total Duração'], ascending=[False, False, True])
-            return df_summary.head(5)
+    player_stats = defaultdict(lambda: {'Total Estrelas': 0, 'Total Destruição': 0, 'Total Duração': 0, 'Guerras': 0})
+    
+    for war_row in war_data_rows:
+        df_war = pd.read_json(war_row[0], orient='split')
+        for _, player_row in df_war.iterrows():
+            if 'Nome' in player_row and 'Estrelas Totais' in player_row:
+                player_name = player_row['Nome']
+                player_stats[player_name]['Total Estrelas'] += player_row.get('Estrelas Totais', 0)
+                player_stats[player_name]['Total Destruição'] += int(str(player_row.get('Destruição Total', '0%')).replace('%', ''))
+                
+                # --- CORREÇÃO APLICADA AQUI ---
+                # Usamos .get(coluna, 0) para pegar o valor de forma segura.
+                # Se a coluna 'Duração Total (s)' não existir, ele usa 0 e não dá erro.
+                player_stats[player_name]['Total Duração'] += player_row.get('Duração Total (s)', 0)
+                
+                player_stats[player_name]['Guerras'] += 1
+    
+    if not player_stats:
+        return pd.DataFrame()
+
+    df_summary = pd.DataFrame.from_dict(player_stats, orient='index').reset_index().rename(columns={'index': 'Nome'})
+    
+    df_summary = df_summary.sort_values(
+        by=['Total Estrelas', 'Total Destruição', 'Total Duração'],
+        ascending=[False, False, True]
+    )
+    
+    return df_summary.head(5)
+
