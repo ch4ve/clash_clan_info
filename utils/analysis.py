@@ -1,4 +1,8 @@
-# Em utils/analysis.py, SUBSTITUA a função 'analyze_matchup_potential'
+# Conteúdo ATUALIZADO de utils/analysis.py
+
+import pandas as pd
+from collections import defaultdict
+from . import database # Importa nosso módulo de banco de dados
 
 def analyze_matchup_potential(df_our_clan, df_opponent_lineup, our_clan_name, opponent_name):
     """
@@ -54,3 +58,21 @@ def analyze_matchup_potential(df_our_clan, df_opponent_lineup, our_clan_name, op
         "opponent_final_score": opponent_final_score,
         "winner": winner
     }
+
+def get_top_war_performers(limit=5):
+    # (Esta função continua a mesma de antes)
+    war_data_rows = database.get_last_n_wars(limit=limit)
+    if not war_data_rows: return pd.DataFrame()
+    player_stats = defaultdict(lambda: {'Total Estrelas': 0, 'Total Destruição': 0, 'Guerras': 0})
+    for war_row in war_data_rows:
+        df_war = pd.read_json(war_row[0], orient='split')
+        for _, player_row in df_war.iterrows():
+            if 'Nome' in player_row and 'Estrelas Totais' in player_row:
+                player_name = player_row['Nome']
+                player_stats[player_name]['Total Estrelas'] += player_row['Estrelas Totais']
+                player_stats[player_name]['Total Destruição'] += int(str(player_row.get('Destruição Total', '0%')).replace('%', ''))
+                player_stats[player_name]['Guerras'] += 1
+    if not player_stats: return pd.DataFrame()
+    df_summary = pd.DataFrame.from_dict(player_stats, orient='index').reset_index().rename(columns={'index': 'Nome'})
+    df_summary = df_summary.sort_values(by=['Total Estrelas', 'Total Destruição'], ascending=[False, False])
+    return df_summary.head(5)
