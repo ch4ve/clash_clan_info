@@ -57,3 +57,5 @@ weasyprint==66.0
 webencodings==0.5.1
 yarl==1.20.1
 zopfli==0.2.3.post1
+coc.py==3.9.1
+
