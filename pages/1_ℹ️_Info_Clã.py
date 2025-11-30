@@ -110,22 +110,32 @@ else:
 
         st.divider()
 
+        # --- CONTADOR DE SELECIONADOS ---
+        # Calcula quantos estão selecionados no momento
+        num_selecionados = edited_df["Selecionar"].sum()
+
         # --- BOTÃO E LISTA DE SELECIONADOS ---
-        # O botão agora usa o edited_df, que é o resultado imediato da interação do usuário
-        if st.button("Gerar Lista de Selecionados para Liga"):
-            # Filtra apenas quem foi marcado com 'True'
-            selecionados = edited_df[edited_df["Selecionar"] == True]
-            
-            if not selecionados.empty:
-                # Ordena por CV (do maior para o menor) para facilitar a organização
-                lista_final = selecionados[['Nome', 'CV']].sort_values(by='CV', ascending=False)
+        col_btn, col_info = st.columns([1, 2])
+        
+        with col_btn:
+            if st.button("Gerar Lista de Selecionados para Liga"):
+                # Filtra apenas quem foi marcado com 'True'
+                selecionados = edited_df[edited_df["Selecionar"] == True]
                 
-                st.success(f"Lista gerada com {len(lista_final)} jogadores!")
-                
-                # Mostra a tabela limpa
-                st.dataframe(lista_final, hide_index=True, use_container_width=True)
-            else:
-                st.warning("Nenhum jogador foi selecionado na tabela acima.")
+                if not selecionados.empty:
+                    # Ordena por CV (do maior para o menor) para facilitar a organização
+                    lista_final = selecionados[['Nome', 'CV']].sort_values(by='CV', ascending=False)
+                    
+                    st.success(f"Lista gerada com {len(lista_final)} jogadores!")
+                    
+                    # Mostra a tabela limpa
+                    st.dataframe(lista_final, hide_index=True, use_container_width=True)
+                else:
+                    st.warning("Nenhum jogador foi selecionado na tabela acima.")
+        
+        with col_info:
+            # Mostra o contador dinâmico ao lado do botão
+            st.info(f"**Jogadores Selecionados:** {num_selecionados}")
             
     except Exception as e:
         st.error(f"Ocorreu um erro: {e}")
