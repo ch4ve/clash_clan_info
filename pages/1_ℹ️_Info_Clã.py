@@ -60,4 +60,72 @@ else:
         # --- BLOCO DOS KPIs (MÉTRICAS) ---
         st.header("Métricas Principais do Clã")
         kpi1, kpi2, kpi3 = st.columns(3)
-        kpi1
+        kpi1.metric("👥 Total de Membros", f"{len(df_members)} / 50")
+        if 'Troféus' in df_members.columns:
+            kpi2.metric("🏆 Média de Troféus", f"{int(df_members['Troféus'].mean()):,}".replace(",", "."))
+        if 'CV' in df_members.columns:
+            kpi3.metric("🏰 CV Médio", f"{df_members['CV'].mean():.2f}")
+
+        st.divider()
+        
+        # --- BLOCOS DO GRÁFICO E DESTAQUES ---
+        col_chart, col_top5 = st.columns(2)
+        with col_chart:
+            st.header("📊 Composição do Clã")
+            if 'CV' in df_members.columns:
+                df_cv_counts = df_members['CV'].value_counts().sort_index()
+                st.bar_chart(df_cv_counts)
+        
+        with col_top5:
+            st.header("⭐ Destaques de Guerras")
+            st.subheader("🏆 Top 5 - Últimas 5 Guerras")
+            st.info("Em construção...")
+
+        st.divider()
+
+        # --- TABELA DE SELEÇÃO PARA A LIGA ---
+        st.header("Planejamento de Escalação (CWL)")
+        st.caption("Selecione os membros na tabela abaixo para gerar a lista da liga.")
+
+        # Usamos data_editor para permitir interação
+        # O data_editor retorna um NOVO dataframe com as edições, mas não altera o original no cache automaticamente
+        edited_df = st.data_editor(
+            df_members,
+            column_config={
+                "Selecionar": st.column_config.CheckboxColumn(
+                    "Selecionar",
+                    help="Marque para incluir este jogador na lista da liga",
+                    default=False,
+                ),
+                "Ícone Liga": st.column_config.ImageColumn("Liga"),
+                "Link": st.column_config.LinkColumn("Perfil Externo", display_text="Abrir ↗️"),
+                "Tag": None # Esconde a tag
+            },
+            column_order=["Selecionar", "Nome", "Cargo", "CV", "Ícone Liga", "Troféus", "Link"],
+            hide_index=True,
+            use_container_width=True,
+            disabled=["Nome", "Cargo", "CV", "Ícone Liga", "Troféus", "Link"], # Impede edição das outras colunas
+            key="editor_membros" # Chave única para ajudar o Streamlit a gerenciar o estado
+        )
+
+        st.divider()
+
+        # --- BOTÃO E LISTA DE SELECIONADOS ---
+        # O botão agora usa o edited_df, que é o resultado imediato da interação do usuário
+        if st.button("Gerar Lista de Selecionados para Liga"):
+            # Filtra apenas quem foi marcado com 'True'
+            selecionados = edited_df[edited_df["Selecionar"] == True]
+            
+            if not selecionados.empty:
+                # Ordena por CV (do maior para o menor) para facilitar a organização
+                lista_final = selecionados[['Nome', 'CV']].sort_values(by='CV', ascending=False)
+                
+                st.success(f"Lista gerada com {len(lista_final)} jogadores!")
+                
+                # Mostra a tabela limpa
+                st.dataframe(lista_final, hide_index=True, use_container_width=True)
+            else:
+                st.warning("Nenhum jogador foi selecionado na tabela acima.")
+            
+    except Exception as e:
+        st.error(f"Ocorreu um erro: {e}")
