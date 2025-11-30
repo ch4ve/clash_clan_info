@@ -128,10 +128,10 @@ else:
                     
                     st.success(f"Lista gerada com {len(lista_final)} jogadores!")
                     
-                    # Gera o texto formatado para copiar
-                    texto_copia = ""
+                    # Gera o texto formatado para copiar com a nova formatação
+                    texto_copia = "🏆 **LIGA DE CLÃS - Participantes:**\n\n"
                     for index, row in lista_final.iterrows():
-                        texto_copia += f"{row['Nome']} (CV {row['CV']})\n"
+                        texto_copia += f"👤 {row['Nome']} - CV {row['CV']}\n"
                     
                     # Mostra como um bloco de código fácil de copiar
                     st.text_area("Copie a lista abaixo:", value=texto_copia, height=300)
