@@ -1,6 +1,10 @@
+# Conteúdo COMPLETO e FINAL de pages/1_ℹ️_Info_Clã.py
+
 import streamlit as st
 import pandas as pd
-from utils.coc_api import get_clan_data
+# Importações corretas, apontando para sua estrutura 'utils'
+from utils.coc_api import get_clan_data 
+from utils.database import get_top_war_performers
 
 st.set_page_config(page_title="Info do Clã", page_icon="ℹ️", layout="wide")
 
@@ -13,9 +17,7 @@ else:
         coc_email = st.secrets.get("coc_email")
         coc_password = st.secrets.get("coc_password")
 
-        with st.spinner("Buscando e analisando dados do clã..."):
-            # Busca os dados (sem precisar alterar a função na API)
-            df_members, clan_name, clan_badge_url = get_clan_data(clan_tag, coc_email, coc_password)
+        df_members, clan_name, clan_badge_url = get_clan_data(clan_tag, coc_email, coc_password)
         
         if df_members is not None and not df_members.empty:
             
@@ -29,10 +31,11 @@ else:
             
             st.divider()
 
-            # --- BLOCO DOS KPIs (MÉTRICAS) ---
+            # --- BLOCO DOS KPIs (MÉTRICAS) RESTAURADO ---
             st.header("Métricas Principais do Clã")
             kpi1, kpi2, kpi3 = st.columns(3)
             kpi1.metric("👥 Total de Membros", f"{len(df_members)} / 50")
+            # Adicionada verificação para evitar erro se a coluna não existir
             if 'Troféus' in df_members.columns:
                 kpi2.metric("🏆 Média de Troféus", f"{int(df_members['Troféus'].mean()):,}".replace(",", "."))
             if 'CV' in df_members.columns:
@@ -40,7 +43,7 @@ else:
 
             st.divider()
             
-            # --- BLOCOS DO GRÁFICO E DESTAQUES ---
+            # --- BLOCOS DO GRÁFICO E TOP 5 RESTAURADOS ---
             col_chart, col_top5 = st.columns(2)
             with col_chart:
                 st.header("📊 Composição do Clã")
@@ -51,68 +54,27 @@ else:
             with col_top5:
                 st.header("⭐ Destaques de Guerras")
                 st.subheader("🏆 Top 5 - Últimas 5 Guerras")
-                st.info("Em construção...")
+                st.info("Em construção...") # <-- Sua solicitação implementada
 
             st.divider()
 
-            # --- TABELA DE SELEÇÃO PARA A LIGA ---
-            st.header("Planejamento de Escalação (CWL)")
-            st.caption("Selecione os membros na tabela abaixo para gerar a lista da liga.")
-
-            # Prepara os dados para a tabela
-            if 'Tag' in df_members.columns:
-                df_members['Link'] = df_members['Tag'].apply(lambda tag: f"https://www.clashofstats.com/players/{tag.strip('#')}/summary")
-            
-            # Adiciona a coluna de seleção (checkbox) iniciada como Falso
-            df_members.insert(0, "Selecionar", False)
-
-            # Usamos data_editor para permitir interação
-            edited_df = st.data_editor(
+            # --- TABELA COMPLETA DE MEMBROS COM LINKS ---
+            st.header("Membros Atuais")
+            df_members['Link'] = df_members['Tag'].apply(lambda tag: f"https://www.clashofstats.com/players/{tag.strip('#')}/summary")
+            st.dataframe(
                 df_members,
                 column_config={
-                    "Selecionar": st.column_config.CheckboxColumn(
-                        "Selecionar",
-                        help="Marque para incluir este jogador na lista da liga",
-                        default=False,
-                    ),
                     "Ícone Liga": st.column_config.ImageColumn("Liga"),
                     "Link": st.column_config.LinkColumn("Perfil Externo", display_text="Abrir ↗️"),
-                    "Tag": None # Esconde a tag
+                    "Tag": None
                 },
-                column_order=["Selecionar", "Nome", "Cargo", "CV", "Ícone Liga", "Troféus", "Link"],
+                column_order=["Nome", "Cargo", "CV", "Ícone Liga", "Troféus", "Link"],
                 hide_index=True,
-                use_container_width=True,
-                disabled=["Nome", "Cargo", "CV", "Ícone Liga", "Troféus", "Link"] # Impede edição das outras colunas
+                use_container_width=True
             )
-
-            st.divider()
-
-            # --- BOTÃO E LISTA DE SELECIONADOS ---
-            if st.button("Gerar Lista de Selecionados para Liga"):
-                # Filtra apenas quem foi marcado com 'True'
-                selecionados = edited_df[edited_df["Selecionar"] == True]
-                
-                if not selecionados.empty:
-                    # Ordena por CV (do maior para o menor) para facilitar a organização
-                    lista_final = selecionados[['Nome', 'CV']].sort_values(by='CV', ascending=False)
-                    
-                    st.success(f"Lista gerada com {len(lista_final)} jogadores!")
-                    
-                    # Mostra a tabela limpa
-                    st.dataframe(lista_final, hide_index=True, use_container_width=True)
-                else:
-                    st.warning("Nenhum jogador foi selecionado na tabela acima.")
-
         else:
             st.error("Não foi possível carregar os dados do clã.")
             
     except Exception as e:
         st.error(f"Ocorreu um erro: {e}")
-```
-### O que mudou?
 
-1.  **`st.data_editor`:** Substituí o `st.dataframe` (que é estático) pelo `st.data_editor`. Isso permite criar a coluna interativa **"Selecionar"** com checkboxes.
-2.  **Lógica do Botão:** Adicionei o botão **"Gerar Lista..."** que pega as linhas onde você marcou a caixa, filtra apenas o Nome e o CV, e ordena do maior CV para o menor (padrão de guerra).
-3.  **Sem mudanças na API:** Como eu disse, aproveitamos os dados que já vêm prontos, sem precisar mexer no `coc_api.py`!
-
-É só substituir o arquivo da página e testar!
