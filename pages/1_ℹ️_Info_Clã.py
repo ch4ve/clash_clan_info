@@ -124,12 +124,17 @@ else:
                 
                 if not selecionados.empty:
                     # Ordena por CV (do maior para o menor) para facilitar a organização
-                    lista_final = selecionados[['Nome', 'CV']].sort_values(by='CV', ascending=False)
+                    lista_final = selecionados.sort_values(by='CV', ascending=False)
                     
                     st.success(f"Lista gerada com {len(lista_final)} jogadores!")
                     
-                    # Mostra a tabela limpa
-                    st.dataframe(lista_final, hide_index=True, use_container_width=True)
+                    # Gera o texto formatado para copiar
+                    texto_copia = ""
+                    for index, row in lista_final.iterrows():
+                        texto_copia += f"{row['Nome']} (CV {row['CV']})\n"
+                    
+                    # Mostra como um bloco de código fácil de copiar
+                    st.text_area("Copie a lista abaixo:", value=texto_copia, height=300)
                 else:
                     st.warning("Nenhum jogador foi selecionado na tabela acima.")
         
